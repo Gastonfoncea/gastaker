@@ -7,6 +7,7 @@ const CATS = [
   { name: 'Servicios', color: '#A855F7' },
   { name: 'Suscripciones', color: '#EC4899' },
   { name: 'Salud', color: '#10B981' },
+  { name: 'Transferencias', color: '#F59E0B' },
   { name: 'Otros', color: '#64748B' },
 ]
 const COLOR = Object.fromEntries(CATS.map((c) => [c.name, c.color]))
@@ -25,9 +26,10 @@ function parts(n) {
   const [int, cents] = Math.abs(n).toLocaleString('es-AR', { minimumFractionDigits: 2 }).split(',')
   return { int, cents }
 }
-function money(n) {
+function money(n, currency) {
   const { int, cents } = parts(n)
-  return `$${int}<span class="cents">,${cents}</span>`
+  const sym = currency === 'USD' ? 'U$S ' : '$'
+  return `${sym}${int}<span class="cents">,${cents}</span>`
 }
 function moneyShort(n) {
   return '$' + Math.round(n).toLocaleString('es-AR')
@@ -58,16 +60,30 @@ async function load() {
   render(data)
 }
 
-function render({ expenses, totals }) {
-  const total = Object.values(totals).reduce((a, b) => a + b, 0)
-  $('#total').innerHTML = total ? money(total) : '<span class="muted">$0</span>'
+function render({ expenses }) {
+  // Pesos y dólares no se suman: el total grande es en pesos, el USD va aparte.
+  const ars = expenses.filter((e) => (e.currency || 'ARS') === 'ARS')
+  const usd = expenses.filter((e) => e.currency === 'USD')
+  const arsTotal = ars.reduce((s, e) => s + e.amount, 0)
+  const usdTotal = usd.reduce((s, e) => s + e.amount, 0)
 
-  // barra de proporción + leyenda (ordenadas por monto)
+  $('#total').innerHTML = arsTotal ? money(arsTotal, 'ARS') : '<span class="muted">$0</span>'
+
+  const usdEl = $('#total-usd')
+  if (usdTotal > 0) {
+    usdEl.innerHTML = `+ ${money(usdTotal, 'USD')} <span class="muted">en dólares</span>`
+    usdEl.classList.remove('hidden')
+  } else {
+    usdEl.classList.add('hidden')
+  }
+
+  // barra de proporción + leyenda: solo pesos (moneda principal)
+  const totals = {}
+  for (const e of ars) totals[e.category] = (totals[e.category] || 0) + e.amount
   const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1])
   $('#bar').innerHTML = ranked
-    .map(([cat, sum]) => `<span data-w="${(sum / total) * 100}" style="background:${colorOf(cat)}"></span>`)
+    .map(([cat, sum]) => `<span data-w="${(sum / arsTotal) * 100}" style="background:${colorOf(cat)}"></span>`)
     .join('')
-  // animar el width en el próximo frame
   requestAnimationFrame(() => {
     $('#bar').querySelectorAll('span').forEach((el) => {
       el.style.width = el.dataset.w + '%'
@@ -103,7 +119,7 @@ function render({ expenses, totals }) {
             <button class="cat" data-id="${e.id}" data-cat="${e.category}">
               <span class="dot" style="background:${colorOf(e.category)}"></span>${e.category}
             </button>
-            <div class="row-amount">${money(e.amount)}</div>
+            <div class="row-amount${e.currency === 'USD' ? ' usd' : ''}">${money(e.amount, e.currency)}</div>
           </div>`
         })
         .join('')

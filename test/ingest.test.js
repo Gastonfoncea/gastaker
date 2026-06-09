@@ -72,4 +72,34 @@ describe('POST /api/ingest', () => {
     expect(res.status).toBe(200)
     expect(res.body.skipped).toBe(true)
   })
+
+  it('guarda un consumo en dólares con su moneda', async () => {
+    const usd = `MontoU$S6,33
+ComercioMicrosoft*Xbox Game Pass
+Fecha04/06/2026
+Hora00:43`
+    const res = await request(app)
+      .post('/api/ingest')
+      .set('X-Webhook-Secret', 'secreto-test')
+      .send({ messageId: 'usd1', body: usd })
+    expect(res.status).toBe(200)
+    expect(res.body.inserted).toBe(true)
+    expect(res.body.currency).toBe('USD')
+    expect(res.body.category).toBe('Suscripciones')
+  })
+
+  it('categoriza transferencias como Transferencias y usa receivedAt si no hay fecha', async () => {
+    const transfer = `Destinatario    20520522523
+    CBU de Destino    0000003100090368368647
+    Importe    $ 1.000,00
+    Número de comprobante    61949218`
+    const res = await request(app)
+      .post('/api/ingest')
+      .set('X-Webhook-Secret', 'secreto-test')
+      .send({ messageId: 'tr1', body: transfer, receivedAt: '2026-06-02T15:10:00.000Z' })
+    expect(res.status).toBe(200)
+    expect(res.body.inserted).toBe(true)
+    expect(res.body.category).toBe('Transferencias')
+    expect(res.body.currency).toBe('ARS')
+  })
 })

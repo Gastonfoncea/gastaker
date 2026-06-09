@@ -50,4 +50,13 @@ describe('db', () => {
     expect(changed).toBe(true)
     expect(db.list('2026-06')[0].category).toBe('Supermercado')
   })
+
+  it('guarda la moneda (default ARS) y persiste USD', () => {
+    db.insert(sampleRecord({ gmail_message_id: 'ars' })) // sin currency -> ARS
+    db.insert(sampleRecord({ gmail_message_id: 'usd', currency: 'USD', amount: 6.33 }))
+    const rows = db.list('2026-06')
+    const byId = Object.fromEntries(rows.map((r) => [r.gmail_message_id, r]))
+    expect(byId.ars.currency).toBe('ARS')
+    expect(byId.usd.currency).toBe('USD')
+  })
 })

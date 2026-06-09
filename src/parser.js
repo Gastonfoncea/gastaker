@@ -1,51 +1,60 @@
 // src/parser.js
 
-// Toma el texto plano de un mail de gasto de Santander y devuelve
-// { amount, merchant, occurredAt, card, type } o null si no matchea.
+// Parsea el texto plano de un mail de Santander —consumo en pesos, consumo en
+// dólares, o transferencia— y devuelve un objeto normalizado, o null si no
+// reconoce un gasto. Es robusto a etiquetas pegadas al valor ("MontoU$S6,33")
+// y a etiquetas separadas por espacios o saltos de línea ("Monto\n$12.946,00").
+//
+// Devuelve: { amount, currency, merchant, occurredAt, card, type, kind }
 export function parseExpenseEmail(text) {
   if (!text) return null
 
-  const lines = text
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0)
+  const isTransfer = /Destinatario|CBU de Destino|N[úu]mero de comprobante/i.test(text)
 
-  const monto = valueAfterLabel(lines, 'Monto')
-  const comercio = valueAfterLabel(lines, 'Comercio')
-  const fecha = valueAfterLabel(lines, 'Fecha')
-  const hora = valueAfterLabel(lines, 'Hora')
-
-  if (!monto || !comercio) return null
-
-  const amount = parseAmount(monto)
+  // Monto/Importe, con o sin símbolo de moneda, pegado o separado.
+  const amountMatch = text.match(/(?:Importe|Monto)\s*(U\$S|US\$|USD|\$)?\s*([\d.,]+)/i)
+  if (!amountMatch) return null
+  const amount = parseAmount(amountMatch[2])
   if (amount === null) return null
+
+  const currency = /U\$S|US\$|USD/i.test(amountMatch[1] || '') ? 'USD' : 'ARS'
+
+  const merchant = isTransfer ? transferMerchant(text) : valueAfter(text, 'Comercio')
+  if (!merchant) return null
 
   return {
     amount,
-    merchant: comercio,
-    occurredAt: toIso(fecha, hora),
+    currency,
+    merchant,
+    occurredAt: toIso(valueAfter(text, 'Fecha'), valueAfter(text, 'Hora')),
     card: parseCard(text),
     type: parseType(text),
+    kind: isTransfer ? 'transferencia' : 'consumo',
   }
 }
 
-// Busca una línea igual a `label` y devuelve la línea siguiente (el valor).
-function valueAfterLabel(lines, label) {
-  const i = lines.findIndex((l) => l.toLowerCase() === label.toLowerCase())
-  if (i === -1 || i + 1 >= lines.length) return null
-  return lines[i + 1]
+// Captura el valor que sigue a una etiqueta, esté pegado o separado por
+// espacios/saltos de línea. Corta al final de la línea.
+function valueAfter(text, label) {
+  const m = text.match(new RegExp(`${label}\\s*([^\\n\\r]+)`, 'i'))
+  return m ? m[1].trim() : null
 }
 
-// "$12.946,00" -> 12946.00 ; "$1.500.000,50" -> 1500000.50
+function transferMerchant(text) {
+  const dest = valueAfter(text, 'Destinatario')
+  return dest ? `Transferencia · ${dest}` : 'Transferencia'
+}
+
+// "$12.946,00" -> 12946.00 ; "1.500.000,50" -> 1500000.50 ; "6,33" -> 6.33
 function parseAmount(raw) {
-  const cleaned = raw.replace(/[^\d.,]/g, '') // deja solo dígitos, . y ,
+  const cleaned = raw.replace(/[^\d.,]/g, '')
   if (!cleaned) return null
   const normalized = cleaned.replace(/\./g, '').replace(',', '.')
   const n = Number.parseFloat(normalized)
   return Number.isNaN(n) ? null : n
 }
 
-// "08/06/2026" + "19:12" -> "2026-06-08T19:12:00"
+// "08/06/2026" + "19:12" -> "2026-06-08T19:12:00" ; sin fecha -> null
 function toIso(fecha, hora) {
   if (!fecha) return null
   const m = fecha.match(/(\d{2})\/(\d{2})\/(\d{4})/)

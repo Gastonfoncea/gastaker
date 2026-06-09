@@ -16,15 +16,22 @@ export function createDb(path) {
       category          TEXT    NOT NULL,
       card              TEXT,
       occurred_at       TEXT    NOT NULL,
+      currency          TEXT    NOT NULL DEFAULT 'ARS',
       created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `)
 
+  // Migración para bases creadas antes de tener `currency`.
+  const cols = sqlite.prepare('PRAGMA table_info(expenses)').all().map((c) => c.name)
+  if (!cols.includes('currency')) {
+    sqlite.exec("ALTER TABLE expenses ADD COLUMN currency TEXT NOT NULL DEFAULT 'ARS'")
+  }
+
   const insertStmt = sqlite.prepare(`
     INSERT OR IGNORE INTO expenses
-      (gmail_message_id, amount, merchant, category, card, occurred_at)
+      (gmail_message_id, amount, merchant, category, card, occurred_at, currency)
     VALUES
-      (@gmail_message_id, @amount, @merchant, @category, @card, @occurred_at)
+      (@gmail_message_id, @amount, @merchant, @category, @card, @occurred_at, @currency)
   `)
 
   const listStmt = sqlite.prepare(`
@@ -40,7 +47,7 @@ export function createDb(path) {
   return {
     // Devuelve { inserted: boolean }. false si el gmail_message_id ya existía.
     insert(record) {
-      const info = insertStmt.run({ card: null, ...record })
+      const info = insertStmt.run({ card: null, currency: 'ARS', ...record })
       return { inserted: info.changes > 0 }
     },
     // month: 'YYYY-MM'. Devuelve las filas de ese mes, más recientes primero.

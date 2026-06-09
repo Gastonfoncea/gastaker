@@ -223,6 +223,25 @@ body {
   color: var(--ink-3);
   font-weight: 500;
 }
+.total-usd {
+  margin-top: 10px;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.total-usd .cents {
+  color: var(--ink-4);
+}
+.total-usd .muted {
+  font-family: "Geist", sans-serif;
+}
+
+/* monto en dólares en la fila */
+.row-amount.usd {
+  color: var(--ink-2);
+}
 
 .bar {
   display: flex;
