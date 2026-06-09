@@ -1,13 +1,13 @@
 /* gastaker — frontend (vanilla). Ledger view, month stepper, inline recat. */
 
 const CATS = [
-  { name: 'Comida', color: '#e2603b' },
-  { name: 'Supermercado', color: '#0d9488' },
-  { name: 'Transporte', color: '#2563eb' },
-  { name: 'Servicios', color: '#7c3aed' },
-  { name: 'Suscripciones', color: '#db2777' },
-  { name: 'Salud', color: '#16a34a' },
-  { name: 'Otros', color: '#71717a' },
+  { name: 'Comida', color: '#FF6B35' },
+  { name: 'Supermercado', color: '#06B6D4' },
+  { name: 'Transporte', color: '#4F46E5' },
+  { name: 'Servicios', color: '#A855F7' },
+  { name: 'Suscripciones', color: '#EC4899' },
+  { name: 'Salud', color: '#10B981' },
+  { name: 'Otros', color: '#64748B' },
 ]
 const COLOR = Object.fromEntries(CATS.map((c) => [c.name, c.color]))
 const colorOf = (name) => COLOR[name] || '#71717a'
