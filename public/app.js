@@ -72,8 +72,7 @@ function render({ expenses }) {
 
   const usdEl = $('#total-usd')
   if (usdTotal > 0) {
-    const n = usd.length
-    usdEl.innerHTML = `<span class="usd-label">En dólares</span><span class="usd-amount">${money(usdTotal, 'USD')}</span><span class="usd-count">${n} ${n === 1 ? 'gasto' : 'gastos'}</span>`
+    usdEl.innerHTML = money(usdTotal, 'USD')
     usdEl.classList.remove('hidden')
   } else {
     usdEl.classList.add('hidden')
