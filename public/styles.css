@@ -224,18 +224,36 @@ body {
   font-weight: 500;
 }
 .total-usd {
-  margin-top: 10px;
-  font-family: "Geist Mono", ui-monospace, monospace;
-  font-size: 14px;
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 100px;
+}
+.total-usd .usd-label {
+  font-size: 11px;
   font-weight: 500;
-  color: var(--ink-2);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.total-usd .usd-amount {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
-.total-usd .cents {
-  color: var(--ink-4);
+.total-usd .usd-amount .cents {
+  color: var(--ink-3);
 }
-.total-usd .muted {
-  font-family: "Geist", sans-serif;
+.total-usd .usd-count {
+  font-size: 12px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
 }
 
 /* monto en dólares en la fila */
