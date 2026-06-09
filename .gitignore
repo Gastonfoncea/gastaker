@@ -6,3 +6,7 @@ node_modules/
 *.db-shm
 
 .DS_Store
+
+# artefactos locales de deploy (no son parte de la app)
+caddy-autoconfig.log
+autoconfig-caddy.sh
