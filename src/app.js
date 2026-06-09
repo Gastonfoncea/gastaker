@@ -13,6 +13,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 // Se le inyecta db y config para poder testear con una DB en memoria.
 export function createApp({ db, config }) {
   const app = express()
+  // Detrás de Caddy (reverse proxy): confiar en X-Forwarded-Proto para que
+  // req.secure refleje si la conexión real del visitante es HTTPS.
+  app.set('trust proxy', 1)
   app.use(express.json({ limit: '1mb' }))
   app.use(cookieParser())
 

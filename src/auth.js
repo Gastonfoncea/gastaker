@@ -11,6 +11,9 @@ export function loginHandler({ config }) {
     res.cookie('gastaker_auth', config.sessionToken, {
       httpOnly: true,
       sameSite: 'lax',
+      // Solo se manda por HTTPS. En producción (detrás de Caddy) req.secure es
+      // true → la cookie nunca viaja en claro. En tests/local (http) es false.
+      secure: req.secure,
       maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días
     })
     return res.json({ ok: true })
