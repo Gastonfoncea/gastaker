@@ -20,6 +20,8 @@ const MONTHS = [
 
 const $ = (s) => document.querySelector(s)
 let currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
+let activeCat = null // categoría seleccionada para filtrar la tabla
+let lastData = { expenses: [] } // último payload, para re-renderizar sin refetch
 
 /* ---------- formato ---------- */
 function parts(n) {
@@ -56,6 +58,7 @@ async function load() {
   const res = await fetch(`/api/expenses?month=${currentMonth}`)
   if (res.status === 401) return showLogin()
   const data = await res.json()
+  lastData = data
   showApp()
   $('#month-label').textContent = monthLabel(currentMonth)
   render(data)
@@ -87,7 +90,7 @@ function render({ expenses }) {
     .sort((a, b) => b[1] - a[1])
   const barTotal = ranked.reduce((s, [, sum]) => s + sum, 0) || 1
   $('#bar').innerHTML = ranked
-    .map(([cat, sum]) => `<span data-w="${(sum / barTotal) * 100}" style="background:${colorOf(cat)}"></span>`)
+    .map(([cat, sum]) => `<span data-w="${(sum / barTotal) * 100}" style="background:${colorOf(cat)}" title="${cat}"></span>`)
     .join('')
   requestAnimationFrame(() => {
     $('#bar').querySelectorAll('span').forEach((el) => {
@@ -104,15 +107,22 @@ function render({ expenses }) {
     )
     .join('')
 
-  // ledger
-  const empty = expenses.length === 0
-  $('#movs-count').textContent = empty
-    ? ''
-    : `${expenses.length} ${expenses.length === 1 ? 'gasto' : 'gastos'}`
+  // filtro: dropdown con las categorías presentes este mes (Todas + cada una)
+  const present = CATS.map((c) => c.name).filter((name) => expenses.some((e) => e.category === name))
+  $('#cat-filter').innerHTML =
+    `<option value="">Todas las categorías</option>` +
+    present.map((c) => `<option value="${c}"${c === activeCat ? ' selected' : ''}>${c}</option>`).join('')
+
+  // ledger (filtrado por la categoría activa, si hay)
+  const shown = activeCat ? expenses.filter((e) => e.category === activeCat) : expenses
+  const empty = shown.length === 0
+  $('#movs-count').textContent = shown.length
+    ? `${shown.length} ${shown.length === 1 ? 'gasto' : 'gastos'}`
+    : ''
   $('#empty').classList.toggle('hidden', !empty)
   $('#ledger').innerHTML = empty
     ? ''
-    : expenses
+    : shown
         .map((e, i) => {
           const { day, time } = fmtDate(e.occurred_at)
           const card = e.card ? `<span class="row-card">•${e.card}</span>` : ''
@@ -135,6 +145,13 @@ function render({ expenses }) {
       openCatMenu(btn, Number(btn.dataset.id), btn.dataset.cat)
     })
   })
+}
+
+// Aplica el filtro de categoría del dropdown y re-renderiza (sin refetch).
+// cat = '' (Todas) -> null.
+function setFilter(cat) {
+  activeCat = cat || null
+  render(lastData)
 }
 
 function escape(s) {
@@ -200,12 +217,16 @@ function showApp() {
 /* ---------- eventos ---------- */
 $('#prev').addEventListener('click', () => {
   currentMonth = shiftMonth(currentMonth, -1)
+  activeCat = null
   load()
 })
 $('#next').addEventListener('click', () => {
   currentMonth = shiftMonth(currentMonth, 1)
+  activeCat = null
   load()
 })
+
+$('#cat-filter').onchange = (ev) => setFilter(ev.target.value)
 
 $('#login-form').addEventListener('submit', async (ev) => {
   ev.preventDefault()

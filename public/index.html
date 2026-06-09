@@ -55,8 +55,11 @@
       <!-- movimientos (tabla full-width) -->
       <section class="ledger">
         <div class="ledger-head">
-          <span class="overline">Movimientos</span>
-          <span id="movs-count" class="movs-count"></span>
+          <div class="ledger-head-left">
+            <span class="overline">Movimientos</span>
+            <span id="movs-count" class="movs-count"></span>
+          </div>
+          <select id="cat-filter" class="cat-filter" aria-label="Filtrar por categoría"></select>
         </div>
         <div class="table">
           <div class="thead">
