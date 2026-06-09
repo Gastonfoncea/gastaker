@@ -1,34 +1,24 @@
 /* ===========================================================
-   gastaker — ledger, no cards. white mode, ink + accents.
-   responsive: 2-col (web) ↔ stacked (mobile).
+   gastaker — Monarch-style: summary band + full-width table.
+   white mode, ink + categorical accents. ledger, no cards.
    =========================================================== */
 
 :root {
-  /* monochrome ink scale */
   --bg: #ffffff;
   --ink: #0b0b0c;
   --ink-2: #6b6b72;
   --ink-3: #a4a4ac;
   --ink-4: #c9c9d0;
 
-  /* hairlines & surfaces */
   --line: rgba(11, 11, 12, 0.09);
   --line-soft: rgba(11, 11, 12, 0.05);
   --hover: rgba(11, 11, 12, 0.035);
   --press: rgba(11, 11, 12, 0.06);
 
-  /* categorical accents (color = data only) */
-  --c-comida: #e2603b;
-  --c-super: #0d9488;
-  --c-transporte: #2563eb;
-  --c-servicios: #7c3aed;
-  --c-suscripciones: #db2777;
-  --c-salud: #16a34a;
-  --c-otros: #71717a;
-
   --radius: 9px;
   --radius-sm: 6px;
-  --maxw: 1140px;
+  --maxw: 1060px;
+  --cols: 116px 1fr 184px 150px; /* fecha · comercio · categoría · monto */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -37,19 +27,17 @@
   margin: 0;
   padding: 0;
 }
-
 html {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-
 body {
   font-family: "Geist", -apple-system, system-ui, sans-serif;
   background: var(--bg);
   color: var(--ink);
   font-size: 14px;
   line-height: 1.5;
-  background-image: radial-gradient(120% 50% at 50% -10%, rgba(11, 11, 12, 0.022), transparent 60%);
+  background-image: radial-gradient(120% 45% at 50% -10%, rgba(11, 11, 12, 0.02), transparent 60%);
   min-height: 100vh;
 }
 
@@ -145,17 +133,14 @@ body {
 .field button:hover {
   transform: translateX(2px);
 }
-.field button:active {
-  opacity: 0.8;
-}
 .login-error {
   margin-top: 14px;
   font-size: 13px;
-  color: var(--c-comida);
+  color: #e2603b;
 }
 
 /* ===========================================================
-   APP SHELL  +  RESPONSIVE GRID
+   SHELL + TOPBAR
    =========================================================== */
 
 .app {
@@ -178,7 +163,6 @@ body {
   border-bottom: 1px solid var(--line-soft);
   z-index: 20;
 }
-
 .monthnav {
   display: flex;
   align-items: center;
@@ -190,7 +174,6 @@ body {
   color: var(--ink);
   min-width: 104px;
   text-align: center;
-  letter-spacing: -0.01em;
   text-transform: capitalize;
   font-variant-numeric: tabular-nums;
 }
@@ -211,36 +194,20 @@ body {
   background: var(--hover);
   color: var(--ink);
 }
-.step:active {
-  background: var(--press);
-}
-
-/* the grid: single column by default (mobile), two columns on web */
-.grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0;
-}
 
 /* ===========================================================
-   SUMMARY (overline · total · proportion bar · legend)
+   SUMMARY BAND (total · proportion bar · horizontal legend)
    =========================================================== */
 
 .summary {
-  padding: 36px 0 28px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 28px;
-}
-.summary-head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  padding: 44px 0 32px;
 }
 .total {
-  font-size: 44px;
+  font-size: 48px;
   font-weight: 600;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
   line-height: 1;
+  margin-top: 12px;
   font-variant-numeric: tabular-nums;
 }
 .total .cents {
@@ -248,12 +215,11 @@ body {
   font-weight: 500;
 }
 
-/* segmented proportion bar — replaces the typical chart */
 .bar {
   display: flex;
   gap: 3px;
   height: 10px;
-  margin: 26px 0 20px;
+  margin: 28px 0 18px;
 }
 .bar span {
   height: 100%;
@@ -265,13 +231,13 @@ body {
 .legend {
   list-style: none;
   display: flex;
-  flex-direction: column;
-  gap: 11px;
+  flex-wrap: wrap;
+  gap: 10px 26px;
 }
 .legend li {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-size: 13px;
 }
 .legend .dot {
@@ -284,44 +250,54 @@ body {
   color: var(--ink-2);
 }
 .legend .lg-amount {
-  margin-left: auto;
   color: var(--ink);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
-.legend .lg-pct {
-  width: 36px;
-  text-align: right;
-  color: var(--ink-4);
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
-}
 
 /* ===========================================================
-   LEDGER (head + rows, hairline dividers, mono amounts)
+   MOVIMIENTOS (full-width table)
    =========================================================== */
 
 .ledger-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 0 8px 14px;
+  padding-bottom: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 28px;
 }
 .movs-count {
   font-size: 12px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
-.ledger-body {
-  border-top: 1px solid var(--line);
+
+.thead {
+  display: grid;
+  grid-template-columns: var(--cols);
+  gap: 20px;
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--line);
 }
+.thead span {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.thead .right {
+  text-align: right;
+}
+
 .row {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: var(--cols);
+  gap: 20px;
   align-items: center;
-  gap: 16px;
-  padding: 14px 8px;
-  margin: 0 -8px;
+  padding: 13px 10px;
+  margin: 0;
   border-radius: var(--radius-sm);
   border-bottom: 1px solid var(--line-soft);
   transition: background 0.13s var(--ease);
@@ -334,7 +310,25 @@ body {
   border-bottom: none;
 }
 
-.row-main {
+/* fecha */
+.cell-date {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+.cell-date .d-time {
+  color: var(--ink-4);
+}
+
+/* comercio */
+.cell-merchant {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
   min-width: 0;
 }
 .row-merchant {
@@ -345,18 +339,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.row-meta {
-  font-size: 12px;
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-  margin-top: 2px;
-}
-.row-meta .sep {
+.row-card {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 11px;
   color: var(--ink-4);
-  margin: 0 6px;
+  flex: none;
 }
 
-/* category trigger — the only colored chrome, and it's interactive */
+/* categoría — único color del chrome, e interactivo */
 .cat {
   display: inline-flex;
   align-items: center;
@@ -367,6 +357,7 @@ body {
   font-size: 12.5px;
   color: var(--ink-2);
   padding: 5px 9px;
+  margin-left: -9px;
   border-radius: 100px;
   cursor: pointer;
   transition: background 0.13s var(--ease);
@@ -382,6 +373,7 @@ body {
   flex: none;
 }
 
+/* monto */
 .row-amount {
   font-family: "Geist Mono", ui-monospace, monospace;
   font-size: 13.5px;
@@ -395,33 +387,6 @@ body {
   color: var(--ink-3);
 }
 
-/* --- WEB: two columns, sticky summary rail --- */
-@media (min-width: 880px) {
-  .grid {
-    grid-template-columns: 340px 1fr;
-    gap: 72px;
-    padding-top: 12px;
-    align-items: start;
-  }
-  .summary {
-    position: sticky;
-    top: 88px;
-    padding: 40px 0 0;
-    border-bottom: none;
-    margin-bottom: 0;
-  }
-  .ledger {
-    padding-top: 40px;
-  }
-}
-
-@media (min-width: 1040px) {
-  .grid {
-    grid-template-columns: 380px 1fr;
-    gap: 88px;
-  }
-}
-
 /* ===========================================================
    CATEGORY POPOVER
    =========================================================== */
@@ -429,7 +394,7 @@ body {
 .catmenu {
   position: fixed;
   z-index: 50;
-  min-width: 180px;
+  min-width: 184px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -528,7 +493,6 @@ body {
     transform: scale(1) translateY(0);
   }
 }
-
 @media (prefers-reduced-motion: reduce) {
   *,
   .bar span {
@@ -538,32 +502,54 @@ body {
 }
 
 /* ===========================================================
-   MOBILE FINE-TUNING
+   MOBILE — la tabla colapsa a filas apiladas
    =========================================================== */
 
-@media (max-width: 560px) {
+@media (max-width: 620px) {
   .app {
     padding: 0 18px 80px;
   }
   .total {
-    font-size: 38px;
+    font-size: 40px;
+  }
+  .thead {
+    display: none;
   }
   .row {
     grid-template-columns: 1fr auto;
     grid-template-areas:
-      "main amount"
-      "cat  cat";
-    gap: 7px 16px;
+      "merchant amount"
+      "meta     meta";
+    gap: 6px 16px;
+    padding: 14px 8px;
   }
-  .row-main {
-    grid-area: main;
+  .cell-merchant {
+    grid-area: merchant;
   }
   .row-amount {
     grid-area: amount;
   }
+  .cell-date {
+    grid-area: meta;
+    order: 2;
+  }
+  .cat {
+    grid-area: meta;
+    justify-self: start;
+  }
+  /* en mobile: fecha + categoría comparten la fila inferior */
+  .row {
+    grid-template-areas:
+      "merchant amount"
+      "cat      date";
+  }
+  .cell-date {
+    grid-area: date;
+    justify-self: end;
+    align-self: center;
+  }
   .cat {
     grid-area: cat;
-    justify-self: start;
     margin-left: -9px;
   }
 }

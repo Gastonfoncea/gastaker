@@ -32,6 +32,12 @@ function money(n) {
 function moneyShort(n) {
   return '$' + Math.round(n).toLocaleString('es-AR')
 }
+function fmtDate(iso) {
+  // "2026-06-08T19:12:00" -> { day: "08/06", time: "19:12" }
+  const [date, t = ''] = iso.split('T')
+  const [, mo, da] = date.split('-')
+  return { day: `${da}/${mo}`, time: t.slice(0, 5) }
+}
 function monthLabel(ym) {
   const [y, m] = ym.split('-').map(Number)
   return `${MONTHS[m - 1]} ${y}`
@@ -68,15 +74,13 @@ function render({ expenses, totals }) {
     })
   })
   $('#legend').innerHTML = ranked
-    .map(([cat, sum]) => {
-      const pct = Math.round((sum / total) * 100)
-      return `<li>
+    .map(
+      ([cat, sum]) => `<li>
         <span class="dot" style="background:${colorOf(cat)}"></span>
         <span class="lg-name">${cat}</span>
         <span class="lg-amount">${moneyShort(sum)}</span>
-        <span class="lg-pct">${pct}%</span>
       </li>`
-    })
+    )
     .join('')
 
   // ledger
@@ -89,12 +93,12 @@ function render({ expenses, totals }) {
     ? ''
     : expenses
         .map((e, i) => {
-          const dt = e.occurred_at.slice(0, 16).replace('T', ' · ')
-          const card = e.card ? `<span class="sep">·</span>•${e.card}` : ''
+          const { day, time } = fmtDate(e.occurred_at)
+          const card = e.card ? `<span class="row-card">•${e.card}</span>` : ''
           return `<div class="row" style="animation-delay:${Math.min(i * 22, 260)}ms">
-            <div class="row-main">
-              <div class="row-merchant">${escape(e.merchant)}</div>
-              <div class="row-meta">${dt}${card}</div>
+            <div class="cell-date"><span class="d-day">${day}</span><span class="d-time">${time}</span></div>
+            <div class="cell-merchant">
+              <span class="row-merchant">${escape(e.merchant)}</span>${card}
             </div>
             <button class="cat" data-id="${e.id}" data-cat="${e.category}">
               <span class="dot" style="background:${colorOf(e.category)}"></span>${e.category}

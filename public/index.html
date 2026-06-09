@@ -43,30 +43,34 @@
         </nav>
       </header>
 
-      <div class="grid">
-        <!-- columna resumen (rail izquierdo en web, bloque superior en mobile) -->
-        <aside class="summary">
-          <div class="summary-head">
-            <span class="overline">Total del mes</span>
-            <h2 id="total" class="total">—</h2>
-          </div>
-          <div id="bar" class="bar" aria-hidden="true"></div>
-          <ul id="legend" class="legend"></ul>
-        </aside>
+      <!-- resumen del mes (banda full-width) -->
+      <section class="summary">
+        <span class="overline">Total del mes</span>
+        <h2 id="total" class="total">—</h2>
+        <div id="bar" class="bar" aria-hidden="true"></div>
+        <ul id="legend" class="legend"></ul>
+      </section>
 
-        <!-- columna movimientos -->
-        <section class="ledger">
-          <div class="ledger-head">
-            <span class="overline">Movimientos</span>
-            <span id="movs-count" class="movs-count"></span>
+      <!-- movimientos (tabla full-width) -->
+      <section class="ledger">
+        <div class="ledger-head">
+          <span class="overline">Movimientos</span>
+          <span id="movs-count" class="movs-count"></span>
+        </div>
+        <div class="table">
+          <div class="thead">
+            <span>Fecha</span>
+            <span>Comercio</span>
+            <span>Categoría</span>
+            <span class="right">Monto</span>
           </div>
           <div id="ledger" class="ledger-body"></div>
-          <div id="empty" class="empty hidden">
-            <span class="empty-mark">∅</span>
-            <p>Sin gastos este mes.<br /><span class="muted">Cuando llegue un mail de Santander, aparece acá.</span></p>
-          </div>
-        </section>
-      </div>
+        </div>
+        <div id="empty" class="empty hidden">
+          <span class="empty-mark">∅</span>
+          <p>Sin gastos este mes.<br /><span class="muted">Cuando llegue un mail de Santander, aparece acá.</span></p>
+        </div>
+      </section>
     </div>
 
     <!-- popover de categorías (posicionado por JS) -->
