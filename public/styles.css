@@ -414,6 +414,14 @@ body {
 .row-amount .cents {
   color: var(--ink-3);
 }
+/* anulación / devolución: monto negativo, en verde "crédito" */
+.row-amount.refund {
+  color: #16a34a;
+}
+.row-amount.refund .cents {
+  color: #16a34a;
+  opacity: 0.6;
+}
 
 /* ===========================================================
    CATEGORY POPOVER

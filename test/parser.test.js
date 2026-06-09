@@ -150,14 +150,18 @@ Número de comprobante 61649016`
 
   // ---- mails que NO son gastos -> null ----
 
-  it('descarta una anulación de consumo', () => {
+  it('una anulación se guarda como monto negativo (netea)', () => {
     const body = `2034 Aviso anulacion de consumo credito
 Se anuló el pago que hiciste con tu *Tarjeta Santander Visa Crédito *terminada en *3967*:
 Monto
 *$18.441,00*
 Comercio
 *PAYU*AR*UBER*`
-    expect(parseExpenseEmail(body)).toBeNull()
+    const r = parseExpenseEmail(body)
+    expect(r).not.toBeNull()
+    expect(r.amount).toBe(-18441)
+    expect(r.kind).toBe('anulacion')
+    expect(r.merchant).toBe('PAYU*AR*UBER')
   })
 
   it('descarta el resumen de tarjeta', () => {

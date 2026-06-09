@@ -14,14 +14,16 @@
 // Devuelve: { amount, currency, merchant, occurredAt, card, type, kind }
 export function parseExpenseEmail(text) {
   if (!text) return null
-  if (isNonExpense(text)) return null
+  if (isIgnored(text)) return null
 
+  const isAnulacion = /se anul[óo] el pago|pago.{0,20}anulad|anulaci[óo]n de consumo/i.test(text)
   const isTransfer = /Destinatario|CBU de Destino|N[úu]mero de comprobante/i.test(text)
 
   const rawAmount = isTransfer ? valueAfter(text, 'Importe') : valueAfter(text, 'Monto')
   if (!rawAmount) return null
-  const amount = parseAmount(rawAmount)
+  let amount = parseAmount(rawAmount)
   if (amount === null) return null
+  if (isAnulacion) amount = -Math.abs(amount) // una anulación resta del total
 
   const currency = /U\$S|US\$|USD/i.test(rawAmount) ? 'USD' : 'ARS'
 
@@ -35,17 +37,17 @@ export function parseExpenseEmail(text) {
     occurredAt: toIso(valueAfter(text, 'Fecha'), valueAfter(text, 'Hora')),
     card: parseCard(text),
     type: parseType(text),
-    kind: isTransfer ? 'transferencia' : 'consumo',
+    kind: isAnulacion ? 'anulacion' : isTransfer ? 'transferencia' : 'consumo',
   }
 }
 
-// Mails que parecen gastos pero NO lo son.
-function isNonExpense(text) {
+// Mails que NO son movimientos (no suman ni restan): resúmenes, vencimientos,
+// promos. (Las anulaciones SÍ son movimientos: se guardan en negativo.)
+function isIgnored(text) {
   return (
-    /se anul[óo] el pago|pago.{0,20}anulad|anulaci[óo]n de consumo/i.test(text) || // anulaciones
-    /resumen de tu tarjeta|fecha de cierre|importe en pesos|importe en d[óo]lares/i.test(text) || // resumen
-    /pr[óo]ximo a vencer/i.test(text) || // vencimiento
-    /superclub|puntos acumulados/i.test(text) // promos
+    /resumen de tu tarjeta|fecha de cierre|importe en pesos|importe en d[óo]lares/i.test(text) ||
+    /pr[óo]ximo a vencer/i.test(text) ||
+    /superclub|puntos acumulados/i.test(text)
   )
 }
 

@@ -29,7 +29,8 @@ function parts(n) {
 function money(n, currency) {
   const { int, cents } = parts(n)
   const sym = currency === 'USD' ? 'U$S ' : '$'
-  return `${sym}${int}<span class="cents">,${cents}</span>`
+  const sign = n < 0 ? '−' : ''
+  return `${sign}${sym}${int}<span class="cents">,${cents}</span>`
 }
 function moneyShort(n) {
   return '$' + Math.round(n).toLocaleString('es-AR')
@@ -77,12 +78,16 @@ function render({ expenses }) {
     usdEl.classList.add('hidden')
   }
 
-  // barra de proporción + leyenda: solo pesos (moneda principal)
+  // barra de proporción + leyenda: solo pesos, y solo categorías con neto > 0
+  // (las anulaciones restan, así que una categoría puede netear a 0 y no se muestra)
   const totals = {}
   for (const e of ars) totals[e.category] = (totals[e.category] || 0) + e.amount
-  const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1])
+  const ranked = Object.entries(totals)
+    .filter(([, sum]) => sum > 0)
+    .sort((a, b) => b[1] - a[1])
+  const barTotal = ranked.reduce((s, [, sum]) => s + sum, 0) || 1
   $('#bar').innerHTML = ranked
-    .map(([cat, sum]) => `<span data-w="${(sum / arsTotal) * 100}" style="background:${colorOf(cat)}"></span>`)
+    .map(([cat, sum]) => `<span data-w="${(sum / barTotal) * 100}" style="background:${colorOf(cat)}"></span>`)
     .join('')
   requestAnimationFrame(() => {
     $('#bar').querySelectorAll('span').forEach((el) => {
@@ -119,7 +124,7 @@ function render({ expenses }) {
             <button class="cat" data-id="${e.id}" data-cat="${e.category}">
               <span class="dot" style="background:${colorOf(e.category)}"></span>${e.category}
             </button>
-            <div class="row-amount${e.currency === 'USD' ? ' usd' : ''}">${money(e.amount, e.currency)}</div>
+            <div class="row-amount${e.currency === 'USD' ? ' usd' : ''}${e.amount < 0 ? ' refund' : ''}">${money(e.amount, e.currency)}</div>
           </div>`
         })
         .join('')
