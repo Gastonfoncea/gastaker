@@ -3,30 +3,66 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Gastaker</title>
+    <title>gastaker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <!-- Login -->
-    <div id="login" class="card hidden">
-      <h1>Gastaker</h1>
-      <p>Ingresá tu contraseña</p>
-      <form id="login-form">
-        <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" />
-        <button type="submit">Entrar</button>
+    <!-- ░░ LOGIN ░░ -->
+    <main id="login" class="login hidden">
+      <form id="login-form" class="login-form" novalidate>
+        <h1 class="wordmark">gastaker<span class="caret">_</span></h1>
+        <p class="login-sub">Tus gastos, anotados solos.</p>
+        <label class="field">
+          <input
+            id="password"
+            type="password"
+            placeholder="Contraseña"
+            autocomplete="current-password"
+            autofocus
+          />
+          <button type="submit" aria-label="Entrar">→</button>
+        </label>
+        <p id="login-error" class="login-error hidden">Clave incorrecta</p>
       </form>
-      <p id="login-error" class="error hidden">Clave incorrecta</p>
+    </main>
+
+    <!-- ░░ APP ░░ -->
+    <div id="app" class="app hidden">
+      <header class="topbar">
+        <div class="wordmark sm">gastaker<span class="caret">_</span></div>
+        <nav class="monthnav">
+          <button id="prev" class="step" aria-label="Mes anterior">‹</button>
+          <span id="month-label" class="month-label">—</span>
+          <button id="next" class="step" aria-label="Mes siguiente">›</button>
+        </nav>
+      </header>
+
+      <section class="summary">
+        <div class="summary-head">
+          <span class="overline">Total del mes</span>
+          <h2 id="total" class="total">—</h2>
+        </div>
+        <div id="bar" class="bar" aria-hidden="true"></div>
+        <ul id="legend" class="legend"></ul>
+      </section>
+
+      <section class="ledger">
+        <div id="ledger" class="ledger-body"></div>
+        <div id="empty" class="empty hidden">
+          <span class="empty-mark">∅</span>
+          <p>Sin gastos este mes.<br /><span class="muted">Cuando llegue un mail de Santander, aparece acá.</span></p>
+        </div>
+      </section>
     </div>
 
-    <!-- App -->
-    <div id="app" class="hidden">
-      <header>
-        <h1>Gastaker</h1>
-        <input id="month" type="month" />
-      </header>
-      <section id="totals" class="totals"></section>
-      <section id="list" class="list"></section>
-    </div>
+    <!-- popover de categorías (posicionado por JS) -->
+    <div id="catmenu" class="catmenu hidden" role="menu"></div>
 
     <script src="/app.js"></script>
   </body>

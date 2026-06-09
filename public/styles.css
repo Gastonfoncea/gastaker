@@ -1,68 +1,524 @@
+/* ===========================================================
+   gastaker — ledger, no cards. white mode, ink + accents.
+   =========================================================== */
+
 :root {
-  --bg: #0f1115;
-  --card: #181b22;
-  --text: #e6e8ee;
-  --muted: #9aa0ad;
-  --accent: #6ea8fe;
-  --border: #262a33;
+  /* monochrome ink scale */
+  --bg: #ffffff;
+  --ink: #0b0b0c;
+  --ink-2: #6b6b72;
+  --ink-3: #a4a4ac;
+  --ink-4: #c9c9d0;
+
+  /* hairlines & surfaces */
+  --line: rgba(11, 11, 12, 0.09);
+  --line-soft: rgba(11, 11, 12, 0.05);
+  --hover: rgba(11, 11, 12, 0.035);
+  --press: rgba(11, 11, 12, 0.06);
+
+  /* categorical accents (color = data only) */
+  --c-comida: #e2603b;
+  --c-super: #0d9488;
+  --c-transporte: #2563eb;
+  --c-servicios: #7c3aed;
+  --c-suscripciones: #db2777;
+  --c-salud: #16a34a;
+  --c-otros: #71717a;
+
+  --radius: 9px;
+  --radius-sm: 6px;
+  --maxw: 660px;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-* { box-sizing: border-box; }
-body {
+
+* {
+  box-sizing: border-box;
   margin: 0;
-  font-family: -apple-system, system-ui, sans-serif;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: "Geist", -apple-system, system-ui, sans-serif;
   background: var(--bg);
-  color: var(--text);
-  padding: 24px;
-  max-width: 720px;
-  margin-inline: auto;
-}
-.hidden { display: none !important; }
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 360px;
-  margin: 80px auto;
-}
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-h1 { font-size: 22px; margin: 0; }
-input, button, select {
-  font: inherit;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-}
-button { background: var(--accent); color: #0b0d12; border: none; cursor: pointer; font-weight: 600; }
-.error { color: #ff6b6b; }
-.totals { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.chip {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 12px;
+  color: var(--ink);
   font-size: 14px;
+  line-height: 1.5;
+  /* faint top vignette for depth, otherwise flat white */
+  background-image: radial-gradient(120% 60% at 50% -10%, rgba(11, 11, 12, 0.025), transparent 60%);
+  min-height: 100vh;
 }
-.chip strong { color: var(--accent); }
-.list { display: flex; flex-direction: column; gap: 8px; }
-.expense {
+
+.hidden {
+  display: none !important;
+}
+
+.muted {
+  color: var(--ink-3);
+}
+
+.wordmark {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.wordmark .caret {
+  color: var(--ink-4);
+  font-weight: 400;
+}
+.wordmark.sm {
+  font-size: 15px;
+}
+
+/* ===========================================================
+   LOGIN
+   =========================================================== */
+
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.login-form {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  animation: rise 0.5s var(--ease) both;
+}
+.login .wordmark {
+  font-size: 34px;
+  letter-spacing: -0.045em;
+}
+.login-sub {
+  color: var(--ink-3);
+  font-size: 14px;
+  margin-top: 8px;
+  margin-bottom: 36px;
+}
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 4px 4px 16px;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+.field:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(11, 11, 12, 0.06);
+}
+.field input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  padding: 10px 0;
+}
+.field input::placeholder {
+  color: var(--ink-3);
+}
+.field button {
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: #fff;
+  font-size: 17px;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), opacity 0.15s var(--ease);
+}
+.field button:hover {
+  transform: translateX(2px);
+}
+.field button:active {
+  opacity: 0.8;
+}
+.login-error {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--c-comida);
+}
+
+/* ===========================================================
+   APP SHELL
+   =========================================================== */
+
+.app {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 24px 96px;
+  animation: fade 0.4s var(--ease) both;
+}
+
+.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
+  height: 64px;
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--line-soft);
+  z-index: 20;
 }
-.expense .merchant { font-weight: 600; }
-.expense .meta { color: var(--muted); font-size: 13px; }
-.expense .amount { font-variant-numeric: tabular-nums; font-weight: 600; }
-.expense select { font-size: 13px; padding: 4px 8px; }
-.empty { color: var(--muted); text-align: center; padding: 40px; }
+
+.monthnav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.month-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  min-width: 104px;
+  text-align: center;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+  font-variant-numeric: tabular-nums;
+}
+.step {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  font-size: 17px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.step:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.step:active {
+  background: var(--press);
+}
+
+/* ===========================================================
+   SUMMARY (overline · total · proportion bar · legend)
+   =========================================================== */
+
+.overline {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.summary {
+  padding: 40px 0 28px;
+}
+.summary-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.total {
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.total .cents {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+/* segmented proportion bar — replaces the typical chart */
+.bar {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+  margin: 28px 0 18px;
+}
+.bar span {
+  height: 100%;
+  border-radius: 3px;
+  width: 0;
+  transition: width 0.7s var(--ease);
+}
+
+.legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+}
+.legend li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.legend .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  transform: translateY(1px);
+}
+.legend .lg-name {
+  color: var(--ink-2);
+}
+.legend .lg-amount {
+  color: var(--ink);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.legend .lg-pct {
+  color: var(--ink-4);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===========================================================
+   LEDGER (rows, hairline dividers, mono amounts)
+   =========================================================== */
+
+.ledger {
+  border-top: 1px solid var(--line);
+}
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 8px;
+  margin: 0 -8px;
+  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--line-soft);
+  cursor: default;
+  transition: background 0.13s var(--ease);
+  animation: rise 0.45s var(--ease) both;
+}
+.row:hover {
+  background: var(--hover);
+}
+.row:last-child {
+  border-bottom: none;
+}
+
+.row-main {
+  min-width: 0;
+}
+.row-merchant {
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+.row-meta .sep {
+  color: var(--ink-4);
+  margin: 0 6px;
+}
+
+/* category trigger — the only colored chrome, and it's interactive */
+.cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  padding: 5px 9px;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: background 0.13s var(--ease);
+  white-space: nowrap;
+}
+.cat:hover {
+  background: var(--press);
+}
+.cat .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.row-amount {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.row-amount .cents {
+  color: var(--ink-3);
+}
+
+/* ===========================================================
+   CATEGORY POPOVER
+   =========================================================== */
+
+.catmenu {
+  position: fixed;
+  z-index: 50;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px;
+  box-shadow:
+    0 1px 2px rgba(11, 11, 12, 0.06),
+    0 12px 32px -8px rgba(11, 11, 12, 0.18);
+  animation: pop 0.14s var(--ease) both;
+  transform-origin: top left;
+}
+.catmenu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s var(--ease);
+}
+.catmenu button:hover {
+  background: var(--hover);
+}
+.catmenu button .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.catmenu button .check {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 12px;
+  opacity: 0;
+}
+.catmenu button[aria-current="true"] .check {
+  opacity: 1;
+}
+
+/* ===========================================================
+   EMPTY STATE
+   =========================================================== */
+
+.empty {
+  text-align: center;
+  padding: 72px 0;
+  color: var(--ink-2);
+}
+.empty-mark {
+  display: block;
+  font-size: 30px;
+  color: var(--ink-4);
+  margin-bottom: 16px;
+  font-weight: 300;
+}
+.empty p {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ===========================================================
+   MOTION
+   =========================================================== */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .bar span {
+    transition: none !important;
+  }
+}
+
+/* ===========================================================
+   RESPONSIVE
+   =========================================================== */
+
+@media (max-width: 480px) {
+  .app {
+    padding: 0 16px 80px;
+  }
+  .total {
+    font-size: 38px;
+  }
+  .row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "main amount"
+      "cat  cat";
+    gap: 6px 16px;
+  }
+  .row-main {
+    grid-area: main;
+  }
+  .row-amount {
+    grid-area: amount;
+  }
+  .cat {
+    grid-area: cat;
+    justify-self: start;
+    margin-left: -9px;
+  }
+}
