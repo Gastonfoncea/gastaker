@@ -81,6 +81,9 @@ function render({ expenses, totals }) {
 
   // ledger
   const empty = expenses.length === 0
+  $('#movs-count').textContent = empty
+    ? ''
+    : `${expenses.length} ${expenses.length === 1 ? 'gasto' : 'gastos'}`
   $('#empty').classList.toggle('hidden', !empty)
   $('#ledger').innerHTML = empty
     ? ''

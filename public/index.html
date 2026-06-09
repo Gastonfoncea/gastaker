@@ -43,22 +43,30 @@
         </nav>
       </header>
 
-      <section class="summary">
-        <div class="summary-head">
-          <span class="overline">Total del mes</span>
-          <h2 id="total" class="total">—</h2>
-        </div>
-        <div id="bar" class="bar" aria-hidden="true"></div>
-        <ul id="legend" class="legend"></ul>
-      </section>
+      <div class="grid">
+        <!-- columna resumen (rail izquierdo en web, bloque superior en mobile) -->
+        <aside class="summary">
+          <div class="summary-head">
+            <span class="overline">Total del mes</span>
+            <h2 id="total" class="total">—</h2>
+          </div>
+          <div id="bar" class="bar" aria-hidden="true"></div>
+          <ul id="legend" class="legend"></ul>
+        </aside>
 
-      <section class="ledger">
-        <div id="ledger" class="ledger-body"></div>
-        <div id="empty" class="empty hidden">
-          <span class="empty-mark">∅</span>
-          <p>Sin gastos este mes.<br /><span class="muted">Cuando llegue un mail de Santander, aparece acá.</span></p>
-        </div>
-      </section>
+        <!-- columna movimientos -->
+        <section class="ledger">
+          <div class="ledger-head">
+            <span class="overline">Movimientos</span>
+            <span id="movs-count" class="movs-count"></span>
+          </div>
+          <div id="ledger" class="ledger-body"></div>
+          <div id="empty" class="empty hidden">
+            <span class="empty-mark">∅</span>
+            <p>Sin gastos este mes.<br /><span class="muted">Cuando llegue un mail de Santander, aparece acá.</span></p>
+          </div>
+        </section>
+      </div>
     </div>
 
     <!-- popover de categorías (posicionado por JS) -->

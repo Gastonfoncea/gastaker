@@ -1,5 +1,6 @@
 /* ===========================================================
    gastaker — ledger, no cards. white mode, ink + accents.
+   responsive: 2-col (web) ↔ stacked (mobile).
    =========================================================== */
 
 :root {
@@ -27,7 +28,7 @@
 
   --radius: 9px;
   --radius-sm: 6px;
-  --maxw: 660px;
+  --maxw: 1140px;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -48,15 +49,13 @@ body {
   color: var(--ink);
   font-size: 14px;
   line-height: 1.5;
-  /* faint top vignette for depth, otherwise flat white */
-  background-image: radial-gradient(120% 60% at 50% -10%, rgba(11, 11, 12, 0.025), transparent 60%);
+  background-image: radial-gradient(120% 50% at 50% -10%, rgba(11, 11, 12, 0.022), transparent 60%);
   min-height: 100vh;
 }
 
 .hidden {
   display: none !important;
 }
-
 .muted {
   color: var(--ink-3);
 }
@@ -71,6 +70,14 @@ body {
 }
 .wordmark.sm {
   font-size: 15px;
+}
+
+.overline {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 /* ===========================================================
@@ -148,13 +155,13 @@ body {
 }
 
 /* ===========================================================
-   APP SHELL
+   APP SHELL  +  RESPONSIVE GRID
    =========================================================== */
 
 .app {
   max-width: var(--maxw);
   margin: 0 auto;
-  padding: 0 24px 96px;
+  padding: 0 32px 96px;
   animation: fade 0.4s var(--ease) both;
 }
 
@@ -208,20 +215,21 @@ body {
   background: var(--press);
 }
 
+/* the grid: single column by default (mobile), two columns on web */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
 /* ===========================================================
    SUMMARY (overline · total · proportion bar · legend)
    =========================================================== */
 
-.overline {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
 .summary {
-  padding: 40px 0 28px;
+  padding: 36px 0 28px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 28px;
 }
 .summary-head {
   display: flex;
@@ -245,7 +253,7 @@ body {
   display: flex;
   gap: 3px;
   height: 10px;
-  margin: 28px 0 18px;
+  margin: 26px 0 20px;
 }
 .bar span {
   height: 100%;
@@ -257,13 +265,13 @@ body {
 .legend {
   list-style: none;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 22px;
+  flex-direction: column;
+  gap: 11px;
 }
 .legend li {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
 }
 .legend .dot {
@@ -271,27 +279,40 @@ body {
   height: 7px;
   border-radius: 50%;
   flex: none;
-  transform: translateY(1px);
 }
 .legend .lg-name {
   color: var(--ink-2);
 }
 .legend .lg-amount {
+  margin-left: auto;
   color: var(--ink);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 .legend .lg-pct {
+  width: 36px;
+  text-align: right;
   color: var(--ink-4);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 
 /* ===========================================================
-   LEDGER (rows, hairline dividers, mono amounts)
+   LEDGER (head + rows, hairline dividers, mono amounts)
    =========================================================== */
 
-.ledger {
+.ledger-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 8px 14px;
+}
+.movs-count {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.ledger-body {
   border-top: 1px solid var(--line);
 }
 .row {
@@ -303,7 +324,6 @@ body {
   margin: 0 -8px;
   border-radius: var(--radius-sm);
   border-bottom: 1px solid var(--line-soft);
-  cursor: default;
   transition: background 0.13s var(--ease);
   animation: rise 0.45s var(--ease) both;
 }
@@ -375,6 +395,33 @@ body {
   color: var(--ink-3);
 }
 
+/* --- WEB: two columns, sticky summary rail --- */
+@media (min-width: 880px) {
+  .grid {
+    grid-template-columns: 340px 1fr;
+    gap: 72px;
+    padding-top: 12px;
+    align-items: start;
+  }
+  .summary {
+    position: sticky;
+    top: 88px;
+    padding: 40px 0 0;
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  .ledger {
+    padding-top: 40px;
+  }
+}
+
+@media (min-width: 1040px) {
+  .grid {
+    grid-template-columns: 380px 1fr;
+    gap: 88px;
+  }
+}
+
 /* ===========================================================
    CATEGORY POPOVER
    =========================================================== */
@@ -434,7 +481,7 @@ body {
 
 .empty {
   text-align: center;
-  padding: 72px 0;
+  padding: 64px 0;
   color: var(--ink-2);
 }
 .empty-mark {
@@ -483,22 +530,20 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none !important;
-    transition: none !important;
-  }
+  *,
   .bar span {
+    animation: none !important;
     transition: none !important;
   }
 }
 
 /* ===========================================================
-   RESPONSIVE
+   MOBILE FINE-TUNING
    =========================================================== */
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .app {
-    padding: 0 16px 80px;
+    padding: 0 18px 80px;
   }
   .total {
     font-size: 38px;
@@ -508,7 +553,7 @@ body {
     grid-template-areas:
       "main amount"
       "cat  cat";
-    gap: 6px 16px;
+    gap: 7px 16px;
   }
   .row-main {
     grid-area: main;
