@@ -1,23 +1,29 @@
 // src/parser.js
 
-// Parsea el texto plano de un mail de Santander —consumo en pesos, consumo en
-// dólares, o transferencia— y devuelve un objeto normalizado, o null si no
-// reconoce un gasto. Es robusto a etiquetas pegadas al valor ("MontoU$S6,33")
-// y a etiquetas separadas por espacios o saltos de línea ("Monto\n$12.946,00").
+// Parsea el texto plano (getPlainBody) de un mail de Santander y devuelve un
+// gasto normalizado, o null si el mail no es un gasto.
+//
+// Maneja: consumo débito, consumo crédito, débito automático (ARS o USD) y
+// transferencias. Descarta lo que NO es gasto: anulaciones, resúmenes de
+// tarjeta, avisos de vencimiento y promos.
+//
+// Los valores vienen en negrita markdown (*valor*), por eso se limpian los `*`
+// que envuelven cada valor (conservando los `*` internos de nombres como
+// "PAYU*AR*UBER").
 //
 // Devuelve: { amount, currency, merchant, occurredAt, card, type, kind }
 export function parseExpenseEmail(text) {
   if (!text) return null
+  if (isNonExpense(text)) return null
 
   const isTransfer = /Destinatario|CBU de Destino|N[úu]mero de comprobante/i.test(text)
 
-  // Monto/Importe, con o sin símbolo de moneda, pegado o separado.
-  const amountMatch = text.match(/(?:Importe|Monto)\s*(U\$S|US\$|USD|\$)?\s*([\d.,]+)/i)
-  if (!amountMatch) return null
-  const amount = parseAmount(amountMatch[2])
+  const rawAmount = isTransfer ? valueAfter(text, 'Importe') : valueAfter(text, 'Monto')
+  if (!rawAmount) return null
+  const amount = parseAmount(rawAmount)
   if (amount === null) return null
 
-  const currency = /U\$S|US\$|USD/i.test(amountMatch[1] || '') ? 'USD' : 'ARS'
+  const currency = /U\$S|US\$|USD/i.test(rawAmount) ? 'USD' : 'ARS'
 
   const merchant = isTransfer ? transferMerchant(text) : valueAfter(text, 'Comercio')
   if (!merchant) return null
@@ -33,11 +39,23 @@ export function parseExpenseEmail(text) {
   }
 }
 
-// Captura el valor que sigue a una etiqueta, esté pegado o separado por
-// espacios/saltos de línea. Corta al final de la línea.
+// Mails que parecen gastos pero NO lo son.
+function isNonExpense(text) {
+  return (
+    /se anul[óo] el pago|pago.{0,20}anulad|anulaci[óo]n de consumo/i.test(text) || // anulaciones
+    /resumen de tu tarjeta|fecha de cierre|importe en pesos|importe en d[óo]lares/i.test(text) || // resumen
+    /pr[óo]ximo a vencer/i.test(text) || // vencimiento
+    /superclub|puntos acumulados/i.test(text) // promos
+  )
+}
+
+// Valor que sigue a una etiqueta (misma línea o la siguiente). Limpia la
+// negrita markdown que envuelve el valor, conservando los `*` internos.
 function valueAfter(text, label) {
   const m = text.match(new RegExp(`${label}\\s*([^\\n\\r]+)`, 'i'))
-  return m ? m[1].trim() : null
+  if (!m) return null
+  const v = m[1].replace(/^[\s*]+/, '').replace(/[\s*]+$/, '').trim()
+  return v || null
 }
 
 function transferMerchant(text) {
@@ -45,7 +63,7 @@ function transferMerchant(text) {
   return dest ? `Transferencia · ${dest}` : 'Transferencia'
 }
 
-// "$12.946,00" -> 12946.00 ; "1.500.000,50" -> 1500000.50 ; "6,33" -> 6.33
+// "$12.946,00" -> 12946.00 ; "U$S3,29" -> 3.29 ; "$ 8.500,00" -> 8500
 function parseAmount(raw) {
   const cleaned = raw.replace(/[^\d.,]/g, '')
   if (!cleaned) return null
@@ -64,8 +82,9 @@ function toIso(fecha, hora) {
   return `${yyyy}-${mm}-${dd}T${time}:00`
 }
 
+// "terminada en *1458*." -> "1458"
 function parseCard(text) {
-  const m = text.match(/terminada en (\d{4})/i)
+  const m = text.match(/terminada en[*\s]*(\d{4})/i)
   return m ? m[1] : null
 }
 
