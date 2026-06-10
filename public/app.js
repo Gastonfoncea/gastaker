@@ -228,6 +228,21 @@ $('#next').addEventListener('click', () => {
 
 $('#cat-filter').onchange = (ev) => setFilter(ev.target.value)
 
+/* Auto-refresh al volver a la app: entrás (volvés a la pestaña o a la ventana)
+   y se actualiza sola, sin polling. Preserva el mes y el filtro activo. */
+let lastRefresh = 0
+function refreshOnReturn() {
+  if ($('#app').classList.contains('hidden')) return // no logueado: nada que refrescar
+  const now = Date.now()
+  if (now - lastRefresh < 1500) return // evita doble disparo (visibility + focus)
+  lastRefresh = now
+  load()
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshOnReturn()
+})
+window.addEventListener('focus', refreshOnReturn)
+
 $('#login-form').addEventListener('submit', async (ev) => {
   ev.preventDefault()
   const res = await fetch('/api/login', {
