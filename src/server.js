@@ -18,6 +18,8 @@ const config = {
   kapsoWebhookSecret: requireEnv('KAPSO_WEBHOOK_SECRET'),
   allowedNumber: requireEnv('NOTIFY_WHATSAPP'),
   anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5',
+  pushEnabled: process.env.WHATSAPP_PUSH_ENABLED === 'true',
+  notifyWhatsapp: process.env.NOTIFY_WHATSAPP,
 }
 
 const dbPath = process.env.DB_PATH || './gastaker.db'

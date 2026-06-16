@@ -2,6 +2,7 @@
 import express from 'express'
 import { parseEmail } from '../sources/index.js'
 import { categorize } from '../categorizer.js'
+import { avisarSinClasificar } from '../agent/notifier.js'
 
 // Crea el router de ingesta. Valida el secreto del webhook contra config.
 export function ingestRouter({ db, config }) {
@@ -57,6 +58,14 @@ export function ingestRouter({ db, config }) {
       source: parsed.source,
       needs_review: needsReview,
     })
+
+    if (inserted && needsReview && config.pushEnabled) {
+      // No bloquea la respuesta del webhook (no se hace await).
+      avisarSinClasificar(
+        { merchant: parsed.merchant, amount: parsed.amount, currency: parsed.currency },
+        { enabled: true, to: config.notifyWhatsapp }
+      )
+    }
 
     return res.json({ inserted, category, currency: parsed.currency, source: parsed.source })
   })
