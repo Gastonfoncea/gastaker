@@ -102,4 +102,28 @@ Hora00:43`
     expect(res.body.category).toBe('Transferencias')
     expect(res.body.currency).toBe('ARS')
   })
+
+  it('un comercio desconocido entra con needs_review; tras registrarlo, el siguiente no', async () => {
+    const db = createDb(':memory:')
+    const app = createApp({ db, config: CONFIG })
+    const body = `Aviso de consumo TD
+Tarjeta Santander Visa Débito terminada en *1458*.
+Monto
+*$5.000,00*
+Comercio
+*KIOSCO RARO*
+Fecha
+*08/06/2026*
+Hora
+*10:00*`
+    await request(app).post('/api/ingest').set('X-Webhook-Secret', 'secreto-test').send({ messageId: 'k1', body })
+    expect(db.pendientes()).toHaveLength(1) // cayó en Otros -> pendiente
+
+    db.registrarComercio({ match: 'KIOSCO RARO', categoria: 'Comida' })
+    await request(app).post('/api/ingest').set('X-Webhook-Secret', 'secreto-test').send({ messageId: 'k2', body: body.replace('10:00', '11:00') })
+    // el segundo NO queda pendiente (lo agarró findLearned)
+    const last = db.list('2026-06').find((e) => e.gmail_message_id === 'k2')
+    expect(last.category).toBe('Comida')
+    expect(last.needs_review).toBe(0)
+  })
 })

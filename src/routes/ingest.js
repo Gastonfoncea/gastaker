@@ -23,9 +23,23 @@ export function ingestRouter({ db, config }) {
       return res.json({ skipped: true })
     }
 
-    // Las transferencias no tienen comercio: categoría fija (recategorizable).
-    const category =
-      parsed.kind === 'transferencia' ? 'Transferencias' : categorize(parsed.merchant)
+    // Categoría: transferencia fija; si no, regla estática -> comercio aprendido -> default.
+    let category
+    let needsReview = 0
+    if (parsed.kind === 'transferencia') {
+      const learned = db.findLearned(parsed.merchant)
+      category = learned || 'Transferencias'
+      needsReview = learned ? 0 : 1
+    } else {
+      const byRule = categorize(parsed.merchant) // 'Otros' si no matchea
+      if (byRule !== 'Otros') {
+        category = byRule
+      } else {
+        const learned = db.findLearned(parsed.merchant)
+        category = learned || 'Otros'
+        needsReview = learned ? 0 : 1
+      }
+    }
 
     // Si el mail no trae Fecha/Hora (típico en transferencias), usamos la fecha
     // en que llegó el mail.
@@ -41,6 +55,7 @@ export function ingestRouter({ db, config }) {
       occurred_at,
       currency: parsed.currency,
       source: parsed.source,
+      needs_review: needsReview,
     })
 
     return res.json({ inserted, category, currency: parsed.currency, source: parsed.source })
