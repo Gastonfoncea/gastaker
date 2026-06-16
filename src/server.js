@@ -16,6 +16,8 @@ const config = {
   appPassword: requireEnv('APP_PASSWORD'),
   sessionToken: requireEnv('SESSION_TOKEN'),
   kapsoWebhookSecret: requireEnv('KAPSO_WEBHOOK_SECRET'),
+  allowedNumber: requireEnv('NOTIFY_WHATSAPP'),
+  anthropicModel: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5',
 }
 
 const dbPath = process.env.DB_PATH || './gastaker.db'

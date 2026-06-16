@@ -7,6 +7,7 @@ import { ingestRouter } from './routes/ingest.js'
 import { loginHandler } from './auth.js'
 import { expensesRouter } from './routes/expenses.js'
 import { whatsappRouter } from './routes/whatsapp.js'
+import { createMemory } from './agent/memory.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -20,8 +21,9 @@ export function createApp({ db, config }) {
   app.use(express.json({ limit: '1mb' }))
   app.use(cookieParser())
 
+  const memory = createMemory()
   app.use('/api/ingest', ingestRouter({ db, config }))
-  app.use('/api/whatsapp', whatsappRouter({ config }))
+  app.use('/api/whatsapp', whatsappRouter({ config, db, memory }))
   app.post('/api/login', loginHandler({ config }))
   app.use('/api/expenses', expensesRouter({ db, config }))
 
