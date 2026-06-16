@@ -15,6 +15,7 @@ const config = {
   webhookSecret: requireEnv('WEBHOOK_SECRET'),
   appPassword: requireEnv('APP_PASSWORD'),
   sessionToken: requireEnv('SESSION_TOKEN'),
+  kapsoWebhookSecret: requireEnv('KAPSO_WEBHOOK_SECRET'),
 }
 
 const dbPath = process.env.DB_PATH || './gastaker.db'

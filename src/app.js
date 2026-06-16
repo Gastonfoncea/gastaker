@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { ingestRouter } from './routes/ingest.js'
 import { loginHandler } from './auth.js'
 import { expensesRouter } from './routes/expenses.js'
+import { whatsappRouter } from './routes/whatsapp.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -20,6 +21,7 @@ export function createApp({ db, config }) {
   app.use(cookieParser())
 
   app.use('/api/ingest', ingestRouter({ db, config }))
+  app.use('/api/whatsapp', whatsappRouter({ config }))
   app.post('/api/login', loginHandler({ config }))
   app.use('/api/expenses', expensesRouter({ db, config }))
 
