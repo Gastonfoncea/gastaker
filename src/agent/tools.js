@@ -39,6 +39,28 @@ export function buildTools(db) {
       description: 'Lista los gastos que quedaron sin clasificar (desconocidos). Usar para "¿qué quedó sin clasificar?".',
       input_schema: { type: 'object', properties: {} },
     },
+    {
+      name: 'clasificar_gasto',
+      description: 'Asigna una categoría a UN gasto puntual (que no se repite). No crea regla. Pasá el id del gasto.',
+      input_schema: {
+        type: 'object',
+        properties: { gasto_id: { type: 'integer' }, categoria: { type: 'string' } },
+        required: ['gasto_id', 'categoria'],
+      },
+    },
+    {
+      name: 'registrar_comercio',
+      description: 'Registra un comercio/CUIT recurrente para que se autoclasifique a futuro y clasifica los pendientes que matcheen. El "match" debe ser específico (CUIT o parte distintiva del comercio), NUNCA genérico como "Transferencia".',
+      input_schema: {
+        type: 'object',
+        properties: {
+          match: { type: 'string', description: 'Identificador específico: CUIT o parte distintiva del comercio' },
+          categoria: { type: 'string' },
+          alias: { type: 'string', description: 'Nombre lindo opcional, ej. "Alquiler"' },
+        },
+        required: ['match', 'categoria'],
+      },
+    },
   ]
 
   async function execute(name, input) {
@@ -52,6 +74,10 @@ export function buildTools(db) {
           return db.compararMeses(input.mes_a, input.mes_b)
         case 'pendientes':
           return db.pendientes()
+        case 'clasificar_gasto':
+          return { ok: db.clasificarGasto(input.gasto_id, input.categoria) }
+        case 'registrar_comercio':
+          return db.registrarComercio({ match: input.match, categoria: input.categoria, alias: input.alias })
         default:
           return { error: `herramienta desconocida: ${name}` }
       }

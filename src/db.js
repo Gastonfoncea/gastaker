@@ -18,6 +18,7 @@ export function createDb(path) {
       occurred_at       TEXT    NOT NULL,
       currency          TEXT    NOT NULL DEFAULT 'ARS',
       source            TEXT    NOT NULL DEFAULT 'santander',
+      needs_review      INTEGER NOT NULL DEFAULT 0,
       created_at        TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `)
@@ -31,12 +32,24 @@ export function createDb(path) {
     // Las filas existentes son todas de Santander -> se backfillean a 'santander'.
     sqlite.exec("ALTER TABLE expenses ADD COLUMN source TEXT NOT NULL DEFAULT 'santander'")
   }
+  if (!cols.includes('needs_review')) {
+    sqlite.exec('ALTER TABLE expenses ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0')
+  }
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS comercios_conocidos (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      match       TEXT NOT NULL UNIQUE,
+      category    TEXT NOT NULL,
+      alias       TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `)
 
   const insertStmt = sqlite.prepare(`
     INSERT OR IGNORE INTO expenses
-      (gmail_message_id, amount, merchant, category, card, occurred_at, currency, source)
+      (gmail_message_id, amount, merchant, category, card, occurred_at, currency, source, needs_review)
     VALUES
-      (@gmail_message_id, @amount, @merchant, @category, @card, @occurred_at, @currency, @source)
+      (@gmail_message_id, @amount, @merchant, @category, @card, @occurred_at, @currency, @source, @needs_review)
   `)
 
   const listStmt = sqlite.prepare(`
@@ -52,7 +65,7 @@ export function createDb(path) {
   return {
     // Devuelve { inserted: boolean }. false si el gmail_message_id ya existía.
     insert(record) {
-      const info = insertStmt.run({ card: null, currency: 'ARS', source: 'santander', ...record })
+      const info = insertStmt.run({ card: null, currency: 'ARS', source: 'santander', needs_review: 0, ...record })
       return { inserted: info.changes > 0 }
     },
     // month: 'YYYY-MM'. Devuelve las filas de ese mes, más recientes primero.
@@ -111,7 +124,44 @@ export function createDb(path) {
     },
 
     pendientes() {
-      return [] // reemplazado en Task 7 (Fase 2)
+      return sqlite
+        .prepare('SELECT * FROM expenses WHERE needs_review = 1 ORDER BY occurred_at DESC LIMIT 50')
+        .all()
+        .map((r) => ({ id: r.id, fecha: r.occurred_at, comercio: r.merchant, monto: r.amount, moneda: r.currency }))
+    },
+
+    // Busca una regla aprendida cuyo `match` esté contenido en el comercio. Devuelve la categoría o null.
+    findLearned(merchant) {
+      if (!merchant) return null
+      const up = merchant.toUpperCase()
+      for (const row of sqlite.prepare('SELECT match, category FROM comercios_conocidos').all()) {
+        if (up.includes(row.match.toUpperCase())) return row.category
+      }
+      return null
+    },
+
+    clasificarGasto(id, categoria) {
+      return (
+        sqlite
+          .prepare('UPDATE expenses SET category = @categoria, needs_review = 0 WHERE id = @id')
+          .run({ id, categoria }).changes > 0
+      )
+    },
+
+    // Registra un comercio/CUIT aprendido y clasifica los gastos PENDIENTES que matcheen.
+    registrarComercio({ match, categoria, alias = null }) {
+      const m = (match || '').trim()
+      const BLACKLIST = ['transferencia', 'pago', 'compra', 'consumo', 'debito', 'credito']
+      if (m.length < 3 || BLACKLIST.includes(m.toLowerCase())) {
+        throw new Error('match inválido: debe ser un identificador específico (no genérico ni < 4 caracteres)')
+      }
+      sqlite
+        .prepare('INSERT OR REPLACE INTO comercios_conocidos (match, category, alias) VALUES (@m, @categoria, @alias)')
+        .run({ m, categoria, alias })
+      const upd = sqlite
+        .prepare("UPDATE expenses SET category = @categoria, needs_review = 0 WHERE needs_review = 1 AND upper(merchant) LIKE '%' || upper(@m) || '%'")
+        .run({ m, categoria })
+      return { inserted: true, pendientesActualizados: upd.changes }
     },
 
     _raw: sqlite,

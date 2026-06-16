@@ -29,4 +29,9 @@ describe('buildTools (read)', () => {
     const r = await tools.execute('no_existe', {})
     expect(r.error).toBeTruthy()
   })
+
+  it('execute(registrar_comercio) guarda y devuelve pendientesActualizados', async () => {
+    const r = await tools.execute('registrar_comercio', { match: 'NETFLIX', categoria: 'Suscripciones' })
+    expect(r.inserted).toBe(true)
+  })
 })

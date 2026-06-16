@@ -85,4 +85,40 @@ describe('db', () => {
     expect(r['2026-05'].totalArs).toBe(100)
     expect(r['2026-06'].totalArs).toBe(200)
   })
+
+  it('marca needs_review y lo lista en pendientes', () => {
+    db.insert(sampleRecord({ gmail_message_id: 'p', category: 'Otros', needs_review: 1 }))
+    const pend = db.pendientes()
+    expect(pend).toHaveLength(1)
+    expect(pend[0].comercio).toBe('VERDULERIA KATIE')
+  })
+
+  it('findLearned matchea por substring del comercio', () => {
+    db.registrarComercio({ match: '20520522523', categoria: 'Vivienda', alias: 'Alquiler' })
+    expect(db.findLearned('Transferencia · 20520522523')).toBe('Vivienda')
+    expect(db.findLearned('OTRO COMERCIO')).toBeNull()
+  })
+
+  it('clasificarGasto setea la categoría de un gasto y limpia needs_review', () => {
+    db.insert(sampleRecord({ gmail_message_id: 'g', category: 'Otros', needs_review: 1 }))
+    const id = db.list('2026-06')[0].id
+    expect(db.clasificarGasto(id, 'Salud')).toBe(true)
+    const row = db.list('2026-06')[0]
+    expect(row.category).toBe('Salud')
+    expect(row.needs_review).toBe(0)
+  })
+
+  it('registrarComercio guarda la regla y clasifica los pendientes que matchean', () => {
+    db.insert(sampleRecord({ gmail_message_id: 't', merchant: 'Transferencia · 999', category: 'Transferencias', needs_review: 1 }))
+    const r = db.registrarComercio({ match: '999', categoria: 'Vivienda', alias: 'Alquiler' })
+    expect(r.inserted).toBe(true)
+    expect(r.pendientesActualizados).toBe(1)
+    expect(db.list('2026-06')[0].category).toBe('Vivienda')
+    expect(db.list('2026-06')[0].needs_review).toBe(0)
+  })
+
+  it('registrarComercio rechaza un match genérico o muy corto', () => {
+    expect(() => db.registrarComercio({ match: 'transferencia', categoria: 'X' })).toThrow()
+    expect(() => db.registrarComercio({ match: 'ab', categoria: 'X' })).toThrow()
+  })
 })
