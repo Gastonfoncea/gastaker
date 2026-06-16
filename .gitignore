@@ -4,6 +4,9 @@ node_modules/
 *.db-journal
 *.db-wal
 *.db-shm
+# backups locales de la base (contienen datos financieros reales — NO subir)
+gastaker.db.*
+*.bak
 
 .DS_Store
 
