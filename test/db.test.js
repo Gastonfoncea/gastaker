@@ -59,4 +59,30 @@ describe('db', () => {
     expect(byId.ars.currency).toBe('ARS')
     expect(byId.usd.currency).toBe('USD')
   })
+
+  it('resumenMes devuelve totales por moneda y por categoría (solo neto > 0)', () => {
+    db.insert(sampleRecord({ gmail_message_id: 'a', amount: 1000, category: 'Comida', occurred_at: '2026-06-01T10:00:00' }))
+    db.insert(sampleRecord({ gmail_message_id: 'b', amount: 500, category: 'Comida', occurred_at: '2026-06-02T10:00:00' }))
+    db.insert(sampleRecord({ gmail_message_id: 'c', amount: 6.33, currency: 'USD', category: 'Suscripciones', occurred_at: '2026-06-03T10:00:00' }))
+    const r = db.resumenMes('2026-06')
+    expect(r.totalArs).toBe(1500)
+    expect(r.totalUsd).toBe(6.33)
+    expect(r.categoriasArs).toEqual({ Comida: 1500 })
+  })
+
+  it('listarGastos filtra por categoría y comercio', () => {
+    db.insert(sampleRecord({ gmail_message_id: 'a', merchant: 'UBER', category: 'Transporte' }))
+    db.insert(sampleRecord({ gmail_message_id: 'b', merchant: 'VERDU', category: 'Comida' }))
+    expect(db.listarGastos({ month: '2026-06', categoria: 'Transporte' })).toHaveLength(1)
+    expect(db.listarGastos({ month: '2026-06', comercio: 'VERD' })).toHaveLength(1)
+    expect(db.listarGastos({ month: '2026-06' })).toHaveLength(2)
+  })
+
+  it('compararMeses devuelve totales de cada mes', () => {
+    db.insert(sampleRecord({ gmail_message_id: 'a', amount: 100, occurred_at: '2026-05-01T10:00:00' }))
+    db.insert(sampleRecord({ gmail_message_id: 'b', amount: 200, occurred_at: '2026-06-01T10:00:00' }))
+    const r = db.compararMeses('2026-05', '2026-06')
+    expect(r['2026-05'].totalArs).toBe(100)
+    expect(r['2026-06'].totalArs).toBe(200)
+  })
 })

@@ -63,6 +63,57 @@ export function createDb(path) {
     updateCategory(id, category) {
       return updateStmt.run({ id, category }).changes > 0
     },
+
+    // Resumen del mes: total ARS, total USD, y desglose ARS por categoría (neto > 0).
+    resumenMes(month) {
+      const rows = listStmt.all({ prefix: `${month}%` })
+      let totalArs = 0
+      let totalUsd = 0
+      const cat = {}
+      for (const r of rows) {
+        if (r.currency === 'USD') totalUsd += r.amount
+        else {
+          totalArs += r.amount
+          cat[r.category] = (cat[r.category] || 0) + r.amount
+        }
+      }
+      const categoriasArs = {}
+      for (const [k, v] of Object.entries(cat)) if (v > 0) categoriasArs[k] = v
+      return { month, totalArs, totalUsd, categoriasArs }
+    },
+
+    // Lista de movimientos del mes, opcionalmente filtrada (máx 50).
+    listarGastos({ month, categoria, comercio }) {
+      return listStmt
+        .all({ prefix: `${month}%` })
+        .filter((r) => (categoria ? r.category === categoria : true))
+        .filter((r) => (comercio ? r.merchant.toUpperCase().includes(comercio.toUpperCase()) : true))
+        .slice(0, 50)
+        .map((r) => ({
+          id: r.id,
+          fecha: r.occurred_at,
+          comercio: r.merchant,
+          categoria: r.category,
+          monto: r.amount,
+          moneda: r.currency,
+        }))
+    },
+
+    compararMeses(mesA, mesB) {
+      const tot = (m) => {
+        const rows = listStmt.all({ prefix: `${m}%` })
+        return {
+          totalArs: rows.filter((r) => r.currency !== 'USD').reduce((s, r) => s + r.amount, 0),
+          totalUsd: rows.filter((r) => r.currency === 'USD').reduce((s, r) => s + r.amount, 0),
+        }
+      }
+      return { [mesA]: tot(mesA), [mesB]: tot(mesB) }
+    },
+
+    pendientes() {
+      return [] // reemplazado en Task 7 (Fase 2)
+    },
+
     _raw: sqlite,
   }
 }
