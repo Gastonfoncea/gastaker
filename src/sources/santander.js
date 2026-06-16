@@ -1,18 +1,29 @@
-// src/parser.js
-
-// Parsea el texto plano (getPlainBody) de un mail de Santander y devuelve un
-// gasto normalizado, o null si el mail no es un gasto.
+// src/sources/santander.js
+//
+// Fuente de gastos: Santander Argentina (avisos por email).
+// Conoce SUS formatos de mail y los parsea al shape normalizado de Expense.
+// Toda la lógica específica de Santander vive acá.
 //
 // Maneja: consumo débito, consumo crédito, débito automático (ARS o USD) y
-// transferencias. Descarta lo que NO es gasto: anulaciones, resúmenes de
-// tarjeta, avisos de vencimiento y promos.
+// transferencias. Descarta lo que NO es gasto: anulaciones quedan en negativo;
+// resúmenes, vencimientos y promos se ignoran.
 //
 // Los valores vienen en negrita markdown (*valor*), por eso se limpian los `*`
-// que envuelven cada valor (conservando los `*` internos de nombres como
-// "PAYU*AR*UBER").
-//
-// Devuelve: { amount, currency, merchant, occurredAt, card, type, kind }
-export function parseExpenseEmail(text) {
+// que envuelven cada valor (conservando los `*` internos de "PAYU*AR*UBER").
+
+export const santander = {
+  id: 'santander',
+  name: 'Santander Argentina',
+
+  // parse(email) -> Expense { amount, currency, merchant, occurredAt, card, type, kind }
+  // o null si el mail no es un gasto reconocible de Santander.
+  // email = { body, subject?, from? }
+  parse(email) {
+    return parseBody(email?.body || '')
+  },
+}
+
+function parseBody(text) {
   if (!text) return null
   if (isIgnored(text)) return null
 
@@ -41,8 +52,8 @@ export function parseExpenseEmail(text) {
   }
 }
 
-// Mails que NO son movimientos (no suman ni restan): resúmenes, vencimientos,
-// promos. (Las anulaciones SÍ son movimientos: se guardan en negativo.)
+// Mails que NO son movimientos: resúmenes, vencimientos, promos.
+// (Las anulaciones SÍ son movimientos: se guardan en negativo.)
 function isIgnored(text) {
   return (
     /resumen de tu tarjeta|fecha de cierre|importe en pesos|importe en d[óo]lares/i.test(text) ||

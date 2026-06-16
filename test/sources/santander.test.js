@@ -1,6 +1,9 @@
-// test/parser.test.js
+// test/sources/santander.test.js
 import { describe, it, expect } from 'vitest'
-import { parseExpenseEmail } from '../src/parser.js'
+import { santander } from '../../src/sources/santander.js'
+
+// helper: la fuente parsea un email; en estos tests solo importa el body
+const parse = (body) => santander.parse({ body })
 
 const SAMPLE = `Te acercamos el detalle de tu consumo con la Tarjeta Santander Visa Débito terminada en 1458.
 
@@ -16,9 +19,9 @@ Fecha
 Hora
 19:12`
 
-describe('parseExpenseEmail', () => {
+describe('santander.parse', () => {
   it('extrae monto, comercio, fecha/hora y tarjeta', () => {
-    const r = parseExpenseEmail(SAMPLE)
+    const r = parse(SAMPLE)
     expect(r).not.toBeNull()
     expect(r.amount).toBe(12946.0)
     expect(r.merchant).toBe('VERDULERIA KATIE')
@@ -30,12 +33,10 @@ describe('parseExpenseEmail', () => {
   })
 
   it('parsea un consumo en dólares con etiquetas pegadas al valor', () => {
-    const body = `MontoU$S6,33
+    const r = parse(`MontoU$S6,33
 ComercioMicrosoft*Xbox Game Pass
 Fecha04/06/2026
-Hora00:43`
-    const r = parseExpenseEmail(body)
-    expect(r).not.toBeNull()
+Hora00:43`)
     expect(r.amount).toBe(6.33)
     expect(r.currency).toBe('USD')
     expect(r.merchant).toBe('Microsoft*Xbox Game Pass')
@@ -44,40 +45,34 @@ Hora00:43`
   })
 
   it('parsea una transferencia (Importe / Destinatario / sin Comercio)', () => {
-    const body = `Destinatario    20520522523
+    const r = parse(`Destinatario    20520522523
     Cuenta de origen    Cuenta en Pesos XXX-XXX 2910
     CBU de Destino    0000003100090368368647
     Importe    $ 1.000,00
-    Número de comprobante    61949218`
-    const r = parseExpenseEmail(body)
-    expect(r).not.toBeNull()
+    Número de comprobante    61949218`)
     expect(r.amount).toBe(1000)
     expect(r.currency).toBe('ARS')
     expect(r.kind).toBe('transferencia')
     expect(r.merchant).toContain('20520522523')
-    expect(r.occurredAt).toBeNull() // sin Fecha en el mail -> el ingest usa receivedAt
+    expect(r.occurredAt).toBeNull()
   })
 
   it('parsea montos sin decimales y con miles', () => {
-    const body = SAMPLE.replace('$12.946,00', '$1.500.000,50')
-    const r = parseExpenseEmail(body)
-    expect(r.amount).toBe(1500000.5)
+    expect(parse(SAMPLE.replace('$12.946,00', '$1.500.000,50')).amount).toBe(1500000.5)
   })
 
   it('detecta tarjeta de crédito', () => {
-    const body = SAMPLE.replace('Visa Débito', 'Visa Crédito')
-    const r = parseExpenseEmail(body)
-    expect(r.type).toBe('Crédito')
+    expect(parse(SAMPLE.replace('Visa Débito', 'Visa Crédito')).type).toBe('Crédito')
   })
 
   it('devuelve null si falta el Monto o el Comercio', () => {
-    expect(parseExpenseEmail('hola, esto no es un gasto')).toBeNull()
+    expect(parse('hola, esto no es un gasto')).toBeNull()
   })
 
   // ---- formatos REALES (valores en negrita markdown *...*) ----
 
   it('consumo débito real (negrita)', () => {
-    const body = `2668 Aviso de consumo TD
+    const r = parse(`2668 Aviso de consumo TD
 Te acercamos el detalle de tu consumo con la *Tarjeta Santander Visa Débito* terminada en *1458*.
 Monto
 *$12.946,00*
@@ -86,8 +81,7 @@ Comercio
 Fecha
 *08/06/2026*
 Hora
-*19:12*`
-    const r = parseExpenseEmail(body)
+*19:12*`)
     expect(r.amount).toBe(12946.0)
     expect(r.currency).toBe('ARS')
     expect(r.merchant).toBe('VERDULERIA KATIE')
@@ -97,7 +91,7 @@ Hora
   })
 
   it('débito automático en USD', () => {
-    const body = `2225 Aviso de debito automatico
+    const r = parse(`2225 Aviso de debito automatico
 Te acercamos el detalle del débito con tu *Tarjeta Santander Visa Crédito* terminada en *3967.*
 Monto
 *U$S3,29*
@@ -106,8 +100,7 @@ Comercio
 Fecha
 *08/06/2026*
 Hora
-*12:45*`
-    const r = parseExpenseEmail(body)
+*12:45*`)
     expect(r.amount).toBe(3.29)
     expect(r.currency).toBe('USD')
     expect(r.merchant).toBe('APPLECOMBILL')
@@ -115,7 +108,7 @@ Hora
   })
 
   it('consumo crédito conserva los * internos del comercio', () => {
-    const body = `2033 Aviso de consumo credito
+    const r = parse(`2033 Aviso de consumo credito
 Te acercamos el detalle de tu consumo con la *Tarjeta Santander Visa Crédito* terminada en *3967*.
 Monto
 *$20.287,00*
@@ -126,38 +119,35 @@ Comercio
 Fecha
 *06/06/2026*
 Hora
-*21:32*`
-    const r = parseExpenseEmail(body)
+*21:32*`)
     expect(r.amount).toBe(20287.0)
     expect(r.merchant).toBe('PAYU*AR*UBER')
     expect(r.type).toBe('Crédito')
   })
 
   it('transferencia real (Importe $ X / Destinatario)', () => {
-    const body = `Aviso de transferencia confirmada
+    const r = parse(`Aviso de transferencia confirmada
 Se realizó la siguiente transferencia a tu nombre:
 Destinatario 20136843444
 Cuenta de origen Cuenta en Pesos XXX-XXX 2910
 CBU de Destino 0200912811000006536008
 Importe $ 8.500,00
-Número de comprobante 61649016`
-    const r = parseExpenseEmail(body)
+Número de comprobante 61649016`)
     expect(r.amount).toBe(8500.0)
     expect(r.currency).toBe('ARS')
     expect(r.kind).toBe('transferencia')
     expect(r.merchant).toContain('20136843444')
   })
 
-  // ---- mails que NO son gastos -> null ----
+  // ---- mails que NO son gastos / casos especiales ----
 
   it('una anulación se guarda como monto negativo (netea)', () => {
-    const body = `2034 Aviso anulacion de consumo credito
+    const r = parse(`2034 Aviso anulacion de consumo credito
 Se anuló el pago que hiciste con tu *Tarjeta Santander Visa Crédito *terminada en *3967*:
 Monto
 *$18.441,00*
 Comercio
-*PAYU*AR*UBER*`
-    const r = parseExpenseEmail(body)
+*PAYU*AR*UBER*`)
     expect(r).not.toBeNull()
     expect(r.amount).toBe(-18441)
     expect(r.kind).toBe('anulacion')
@@ -165,19 +155,20 @@ Comercio
   })
 
   it('descarta el resumen de tarjeta', () => {
-    const body = `2467 resumentc
+    expect(
+      parse(`2467 resumentc
 El resumen de tu tarjeta de crédito está próximo a vencer
 Importe en pesos
 $ 823.510,04
 Importe en dólares
 U$S 395,73
 Fecha de cierre
-28/05/2026`
-    expect(parseExpenseEmail(body)).toBeNull()
+28/05/2026`)
+    ).toBeNull()
   })
 
   it('descarta vencimiento y promos', () => {
-    expect(parseExpenseEmail('El 10/06/2026 vence tu Tarjeta Santander AMEX terminada en 6124, próximo a vencer')).toBeNull()
-    expect(parseExpenseEmail('tenés 13090 puntos acumulados SuperClub+. Compraste por $50.000,00')).toBeNull()
+    expect(parse('El 10/06/2026 vence tu Tarjeta Santander AMEX terminada en 6124, próximo a vencer')).toBeNull()
+    expect(parse('tenés 13090 puntos acumulados SuperClub+. Compraste por $50.000,00')).toBeNull()
   })
 })

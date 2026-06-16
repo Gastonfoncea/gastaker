@@ -1,6 +1,6 @@
 // src/routes/ingest.js
 import express from 'express'
-import { parseExpenseEmail } from '../parser.js'
+import { parseEmail } from '../sources/index.js'
 import { categorize } from '../categorizer.js'
 
 // Crea el router de ingesta. Valida el secreto del webhook contra config.
@@ -18,7 +18,7 @@ export function ingestRouter({ db, config }) {
       return res.status(400).json({ error: 'faltan messageId o body' })
     }
 
-    const parsed = parseExpenseEmail(body)
+    const parsed = parseEmail({ body, subject: req.body?.subject })
     if (!parsed) {
       return res.json({ skipped: true })
     }
@@ -40,9 +40,10 @@ export function ingestRouter({ db, config }) {
       card: parsed.card,
       occurred_at,
       currency: parsed.currency,
+      source: parsed.source,
     })
 
-    return res.json({ inserted, category, currency: parsed.currency })
+    return res.json({ inserted, category, currency: parsed.currency, source: parsed.source })
   })
 
   return router
