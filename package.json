@@ -9,6 +9,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
     "better-sqlite3": "^11.3.0",
     "cookie-parser": "^1.4.7",
     "express": "^4.21.0"
