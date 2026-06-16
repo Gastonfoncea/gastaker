@@ -1,0 +1,35 @@
+// src/whatsapp.js
+// Envía mensajes de WhatsApp vía Kapso (que es un proxy de la Meta Cloud API).
+// La API key y el phoneNumberId se leen del entorno; nunca van en el código.
+
+const API_BASE = 'https://api.kapso.ai/meta/whatsapp/v24.0'
+
+// Envía un mensaje de texto a `to` (número en formato internacional sin '+').
+// Devuelve la respuesta de Kapso; lanza error si falla.
+export async function sendWhatsApp(to, text) {
+  const apiKey = process.env.KAPSO_API_KEY
+  const phoneNumberId = process.env.KAPSO_PHONE_NUMBER_ID
+  if (!apiKey || !phoneNumberId) {
+    throw new Error('Faltan KAPSO_API_KEY o KAPSO_PHONE_NUMBER_ID en el entorno (.env)')
+  }
+
+  const res = await fetch(`${API_BASE}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to,
+      type: 'text',
+      text: { body: text },
+    }),
+  })
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(`Kapso respondió ${res.status}: ${JSON.stringify(data)}`)
+  }
+  return data
+}
