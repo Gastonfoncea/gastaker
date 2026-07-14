@@ -9,6 +9,7 @@ const PALETTE = [
 ]
 let selectedColor = PALETTE[0]
 let cats = []
+let editingColorId = null // id de la categoría cuya paleta de edición de color está abierta
 
 function escape(s) {
   const d = document.createElement('div')
@@ -42,21 +43,43 @@ function render() {
     .map((c) => {
       const protegida = c.name === 'Otros'
       const acciones = protegida
-        ? '<span class="cat-lock" title="Categoría fija">fija</span>'
-        : `<button class="cat-action" data-act="rename" data-id="${c.id}">Renombrar</button>
+        ? `<button class="cat-action" data-act="color" data-id="${c.id}">Color</button>
+           <span class="cat-lock" title="Categoría fija">fija</span>`
+        : `<button class="cat-action" data-act="color" data-id="${c.id}">Color</button>
+           <button class="cat-action" data-act="rename" data-id="${c.id}">Renombrar</button>
            <button class="cat-action danger" data-act="delete" data-id="${c.id}">Borrar</button>`
+      const colorPicker =
+        editingColorId === c.id
+          ? `<div class="cat-color-picker">${PALETTE.map(
+              (color) =>
+                `<button type="button" class="swatch${color === c.color ? ' sel' : ''}"
+                  style="background:${color}" data-color="${color}" data-id="${c.id}" aria-label="${color}"></button>`
+            ).join('')}</div>`
+          : ''
       return `<div class="cat-row">
         <span class="dot" style="background:${c.color}"></span>
         <span class="cat-name">${escape(c.name)}</span>
         <span class="cat-count">${c.count} ${c.count === 1 ? 'gasto' : 'gastos'}</span>
         ${acciones}
+        ${colorPicker}
       </div>`
     })
     .join('')
 
   $('#cats').querySelectorAll('.cat-action').forEach((b) => {
     const cat = cats.find((c) => c.id === Number(b.dataset.id))
-    b.addEventListener('click', () => (b.dataset.act === 'rename' ? rename(cat) : remove(cat)))
+    b.addEventListener('click', () => {
+      if (b.dataset.act === 'rename') return rename(cat)
+      if (b.dataset.act === 'delete') return remove(cat)
+      if (b.dataset.act === 'color') {
+        editingColorId = editingColorId === cat.id ? null : cat.id
+        render()
+      }
+    })
+  })
+
+  $('#cats').querySelectorAll('.cat-color-picker .swatch').forEach((s) => {
+    s.addEventListener('click', () => recolor(Number(s.dataset.id), s.dataset.color))
   })
 }
 
@@ -78,6 +101,16 @@ async function rename(cat) {
   if (!nuevo || nuevo.trim() === cat.name) return
   try {
     await api(`/api/categories/${cat.id}`, { method: 'PATCH', body: JSON.stringify({ name: nuevo.trim() }) })
+    load()
+  } catch (e) {
+    alert(e.message)
+  }
+}
+
+async function recolor(id, color) {
+  editingColorId = null
+  try {
+    await api(`/api/categories/${id}`, { method: 'PATCH', body: JSON.stringify({ color }) })
     load()
   } catch (e) {
     alert(e.message)

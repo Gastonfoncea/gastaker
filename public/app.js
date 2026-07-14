@@ -165,6 +165,7 @@ function escape(s) {
 const menu = $('#catmenu')
 
 function openCatMenu(anchor, id, current) {
+  mainMenu.classList.add('hidden') // si el hamburguesa estaba abierto, no lo dejamos detrás del popover
   menu.innerHTML = CATS.map(
     (c) => `<button data-name="${c.name}" aria-current="${c.name === current}">
       <span class="dot" style="background:${c.color}"></span>${c.name}
