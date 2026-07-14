@@ -97,7 +97,7 @@ describe('HTTP: invites y register', () => {
     expect((await request(app).get('/api/invites/no-existe')).body).toEqual({ valid: false, reason: 'not_found' })
   })
 
-  it('register exitoso: 201, cookie, 8 categorías, ingest_token, y auto-login', async () => {
+  it('register exitoso: 201, cookie, 9 categorías, ingest_token, y auto-login', async () => {
     const inv = await newInvite()
     const agent = request.agent(app)
     const res = await agent.post('/api/register').send({ token: inv.token, email: 'nuevo@test.com', password: 'clave-nueva' })
@@ -108,7 +108,7 @@ describe('HTTP: invites y register', () => {
     // Seed de 8 categorías + ingest_token.
     const me = (await agent.get('/api/me')).body
     expect(me.ingest_token).toMatch(/^[0-9a-f]{48}$/)
-    expect((await agent.get('/api/categories')).body.categories).toHaveLength(8)
+    expect((await agent.get('/api/categories')).body.categories).toHaveLength(9)
   })
 
   it('register consume el invite: un segundo register con el mismo token da 410', async () => {

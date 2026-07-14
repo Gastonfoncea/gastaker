@@ -792,6 +792,19 @@ body {
   font-size: 12px;
   color: var(--ink-3);
 }
+/* badge de categoría excluida del total ("no suma") */
+.cat-nosum {
+  font-size: 11px;
+  color: var(--ink-3);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+/* gasto de una categoría excluida: se ve en el ledger pero atenuado (no suma) */
+.row.excluded {
+  opacity: 0.45;
+}
 .cat-color-picker {
   flex-basis: 100%;
   display: flex;

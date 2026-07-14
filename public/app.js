@@ -3,6 +3,7 @@
 // Las categorías (nombre + color) viven en la DB y se cargan por API.
 let CATS = []
 let COLOR = {}
+let EXCLUDED = new Set() // categorías que no suman al total (ej: Movimientos internos)
 const colorOf = (name) => COLOR[name] || '#71717a'
 
 async function loadCategories() {
@@ -11,6 +12,7 @@ async function loadCategories() {
   const data = await res.json()
   CATS = data.categories
   COLOR = Object.fromEntries(CATS.map((c) => [c.name, c.color]))
+  EXCLUDED = new Set(CATS.filter((c) => c.excluded).map((c) => c.name))
 }
 
 const MONTHS = [
@@ -67,10 +69,12 @@ async function load() {
 
 function render({ expenses }) {
   // Pesos y dólares no se suman: el total grande es en pesos, el USD va aparte.
+  // Las categorías excluidas (EXCLUDED) se ven en la lista pero no suman a nada.
+  const noSuma = (e) => EXCLUDED.has(e.category)
   const ars = expenses.filter((e) => (e.currency || 'ARS') === 'ARS')
   const usd = expenses.filter((e) => e.currency === 'USD')
-  const arsTotal = ars.reduce((s, e) => s + e.amount, 0)
-  const usdTotal = usd.reduce((s, e) => s + e.amount, 0)
+  const arsTotal = ars.filter((e) => !noSuma(e)).reduce((s, e) => s + e.amount, 0)
+  const usdTotal = usd.filter((e) => !noSuma(e)).reduce((s, e) => s + e.amount, 0)
 
   $('#total').innerHTML = arsTotal ? money(arsTotal, 'ARS') : '<span class="muted">$0</span>'
 
@@ -85,7 +89,10 @@ function render({ expenses }) {
   // barra de proporción + leyenda: solo pesos, y solo categorías con neto > 0
   // (las anulaciones restan, así que una categoría puede netear a 0 y no se muestra)
   const totals = {}
-  for (const e of ars) totals[e.category] = (totals[e.category] || 0) + e.amount
+  for (const e of ars) {
+    if (noSuma(e)) continue
+    totals[e.category] = (totals[e.category] || 0) + e.amount
+  }
   const ranked = Object.entries(totals)
     .filter(([, sum]) => sum > 0)
     .sort((a, b) => b[1] - a[1])
@@ -127,7 +134,7 @@ function render({ expenses }) {
         .map((e, i) => {
           const { day, time } = fmtDate(e.occurred_at)
           const card = e.card ? `<span class="row-card">•${e.card}</span>` : ''
-          return `<div class="row" style="animation-delay:${Math.min(i * 22, 260)}ms">
+          return `<div class="row${noSuma(e) ? ' excluded' : ''}" style="animation-delay:${Math.min(i * 22, 260)}ms">
             <div class="cell-date"><span class="d-day">${day}</span><span class="d-time">${time}</span></div>
             <div class="cell-merchant">
               <span class="row-merchant">${escape(e.merchant)}</span>${card}

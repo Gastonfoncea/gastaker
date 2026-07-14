@@ -4,15 +4,17 @@ import { hashPassword, verifyPassword, randomToken } from './crypto.js'
 
 // Categorías default que se seedean por-usuario al crear cada cuenta.
 // Nombres y colores espejan el CATS histórico del frontend.
+// excluded=1: no suma a los totales (movimientos entre cuentas propias, no gasto).
 const DEFAULT_CATEGORIES = [
-  ['Comida', '#FF6B35'],
-  ['Supermercado', '#06B6D4'],
-  ['Transporte', '#4F46E5'],
-  ['Servicios', '#A855F7'],
-  ['Suscripciones', '#EC4899'],
-  ['Salud', '#10B981'],
-  ['Transferencias', '#F59E0B'],
-  ['Otros', '#64748B'],
+  ['Comida', '#FF6B35', 0],
+  ['Supermercado', '#06B6D4', 0],
+  ['Transporte', '#4F46E5', 0],
+  ['Servicios', '#A855F7', 0],
+  ['Suscripciones', '#EC4899', 0],
+  ['Salud', '#10B981', 0],
+  ['Transferencias', '#F59E0B', 0],
+  ['Otros', '#64748B', 0],
+  ['Movimientos internos', '#94A3B8', 1],
 ]
 
 // Esquema final (multi-user) de las tablas de datos, sin UNIQUE inline: los UNIQUE
@@ -49,6 +51,7 @@ const categoriesSchema = (name) => `
     user_id     INTEGER,
     name        TEXT NOT NULL COLLATE NOCASE,
     color       TEXT NOT NULL,
+    excluded    INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `
@@ -162,6 +165,20 @@ export function createDb(path) {
     );
   `)
 
+  // --- Migración: flag excluded en categories (idempotente) ---
+  // Va después de crear users porque el backfill seedea la categoría a los usuarios
+  // existentes (los nuevos la reciben vía DEFAULT_CATEGORIES en createUser).
+  if (!sqlite.prepare('PRAGMA table_info(categories)').all().some((c) => c.name === 'excluded')) {
+    sqlite.exec('ALTER TABLE categories ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0')
+    sqlite.exec(`
+      INSERT INTO categories (user_id, name, color, excluded)
+      SELECT u.id, 'Movimientos internos', '#94A3B8', 1 FROM users u
+      WHERE NOT EXISTS (
+        SELECT 1 FROM categories c WHERE c.user_id = u.id AND c.name = 'Movimientos internos' COLLATE NOCASE
+      )
+    `)
+  }
+
   const insertStmt = sqlite.prepare(`
     INSERT OR IGNORE INTO expenses
       (user_id, gmail_message_id, amount, merchant, category, card, occurred_at, currency, source, needs_review)
@@ -175,7 +192,7 @@ export function createDb(path) {
     ORDER BY occurred_at DESC
   `)
 
-  const seedCategoryStmt = sqlite.prepare('INSERT INTO categories (user_id, name, color) VALUES (?, ?, ?)')
+  const seedCategoryStmt = sqlite.prepare('INSERT INTO categories (user_id, name, color, excluded) VALUES (?, ?, ?, ?)')
 
   // Error con código, para que las rutas mapeen a status HTTP sin parsear mensajes.
   const fail = (code, message) => {
@@ -188,6 +205,15 @@ export function createDb(path) {
   // forUser(userId): la API de datos con user_id fijado en todas las queries.
   // Expone exactamente la superficie histórica de la db (misma firma).
   function forUser(userId) {
+    // Nombres de las categorías del user que no suman a los totales.
+    const excludedNames = () =>
+      new Set(
+        sqlite
+          .prepare('SELECT name FROM categories WHERE user_id = ? AND excluded = 1')
+          .all(userId)
+          .map((r) => r.name)
+      )
+
     return {
       // Devuelve { inserted: boolean }. false si el (user_id, gmail_message_id) ya existía.
       insert(record) {
@@ -211,12 +237,15 @@ export function createDb(path) {
       },
 
       // Resumen del mes: total ARS, total USD, y desglose ARS por categoría (neto > 0).
+      // Las categorías excluidas (excluded=1) no suman ni aparecen en el desglose.
       resumenMes(month) {
+        const excluded = excludedNames()
         const rows = listStmt.all({ user_id: userId, prefix: `${month}%` })
         let totalArs = 0
         let totalUsd = 0
         const cat = {}
         for (const r of rows) {
+          if (excluded.has(r.category)) continue
           if (r.currency === 'USD') totalUsd += r.amount
           else {
             totalArs += r.amount
@@ -246,8 +275,11 @@ export function createDb(path) {
       },
 
       compararMeses(mesA, mesB) {
+        const excluded = excludedNames()
         const tot = (m) => {
-          const rows = listStmt.all({ user_id: userId, prefix: `${m}%` })
+          const rows = listStmt
+            .all({ user_id: userId, prefix: `${m}%` })
+            .filter((r) => !excluded.has(r.category))
           return {
             totalArs: rows.filter((r) => r.currency !== 'USD').reduce((s, r) => s + r.amount, 0),
             totalUsd: rows.filter((r) => r.currency === 'USD').reduce((s, r) => s + r.amount, 0),
@@ -301,30 +333,34 @@ export function createDb(path) {
       listCategories() {
         return sqlite
           .prepare(`
-            SELECT c.id, c.name, c.color,
+            SELECT c.id, c.name, c.color, c.excluded,
                    (SELECT COUNT(*) FROM expenses e WHERE e.category = c.name AND e.user_id = @user_id) AS count
             FROM categories c WHERE c.user_id = @user_id ORDER BY c.id
           `)
           .all({ user_id: userId })
       },
 
-      createCategory({ name, color }) {
+      createCategory({ name, color, excluded = false }) {
         const n = (name || '').trim()
         if (!n) fail('VALIDATION', 'falta el nombre')
         if (!COLOR_RE.test(color || '')) fail('VALIDATION', 'color inválido (formato #RRGGBB)')
         if (sqlite.prepare('SELECT 1 FROM categories WHERE name = ? COLLATE NOCASE AND user_id = ?').get(n, userId)) {
           fail('DUP', `ya existe la categoría "${n}"`)
         }
-        const info = sqlite.prepare('INSERT INTO categories (user_id, name, color) VALUES (?, ?, ?)').run(userId, n, color)
-        return { id: info.lastInsertRowid, name: n, color }
+        const exc = excluded ? 1 : 0
+        const info = sqlite
+          .prepare('INSERT INTO categories (user_id, name, color, excluded) VALUES (?, ?, ?, ?)')
+          .run(userId, n, color, exc)
+        return { id: info.lastInsertRowid, name: n, color, excluded: exc }
       },
 
       // Renombrar cascadea por nombre (scopeado al user) a expenses y comercios_conocidos.
-      updateCategoryDef(id, { name, color } = {}) {
+      updateCategoryDef(id, { name, color, excluded } = {}) {
         const row = sqlite.prepare('SELECT * FROM categories WHERE id = ? AND user_id = ?').get(id, userId)
         if (!row) fail('NOT_FOUND', 'categoría no encontrada')
         const newName = name === undefined ? row.name : (name || '').trim()
         const newColor = color === undefined ? row.color : color
+        const newExcluded = excluded === undefined ? row.excluded : excluded ? 1 : 0
         if (!newName) fail('VALIDATION', 'falta el nombre')
         if (!COLOR_RE.test(newColor)) fail('VALIDATION', 'color inválido (formato #RRGGBB)')
         if (row.name === 'Otros' && newName !== 'Otros') fail('PROTECTED', '"Otros" no se puede renombrar')
@@ -339,9 +375,11 @@ export function createDb(path) {
             sqlite.prepare('UPDATE expenses SET category = ? WHERE category = ? AND user_id = ?').run(newName, row.name, userId)
             sqlite.prepare('UPDATE comercios_conocidos SET category = ? WHERE category = ? AND user_id = ?').run(newName, row.name, userId)
           }
-          sqlite.prepare('UPDATE categories SET name = ?, color = ? WHERE id = ? AND user_id = ?').run(newName, newColor, id, userId)
+          sqlite
+            .prepare('UPDATE categories SET name = ?, color = ?, excluded = ? WHERE id = ? AND user_id = ?')
+            .run(newName, newColor, newExcluded, id, userId)
         })()
-        return { id, name: newName, color: newColor }
+        return { id, name: newName, color: newColor, excluded: newExcluded }
       },
 
       // Borra la categoría: sus gastos pasan a "Otros" y sus reglas aprendidas se van (todo scopeado).
@@ -384,7 +422,7 @@ export function createDb(path) {
             .prepare('INSERT INTO users (email, password_hash, ingest_token, whatsapp_number, is_admin) VALUES (?, ?, ?, ?, ?)')
             .run(e, passwordHash, ingestToken, wn || null, isAdmin ? 1 : 0)
           userId = info.lastInsertRowid
-          for (const [name, color] of DEFAULT_CATEGORIES) seedCategoryStmt.run(userId, name, color)
+          for (const [name, color, excluded] of DEFAULT_CATEGORIES) seedCategoryStmt.run(userId, name, color, excluded)
         })()
       } catch (err) {
         if (String(err.code || '').includes('CONSTRAINT')) {

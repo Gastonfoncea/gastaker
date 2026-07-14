@@ -42,10 +42,14 @@ function render() {
   $('#cats').innerHTML = cats
     .map((c) => {
       const protegida = c.name === 'Otros'
+      // Toggle "no suma al total": disponible en todas (también en Otros).
+      const sumToggle = `<button class="cat-action" data-act="sum" data-id="${c.id}">${c.excluded ? 'Sumar' : 'No sumar'}</button>`
       const acciones = protegida
         ? `<button class="cat-action" data-act="color" data-id="${c.id}">Color</button>
+           ${sumToggle}
            <span class="cat-lock" title="Categoría fija">fija</span>`
         : `<button class="cat-action" data-act="color" data-id="${c.id}">Color</button>
+           ${sumToggle}
            <button class="cat-action" data-act="rename" data-id="${c.id}">Renombrar</button>
            <button class="cat-action danger" data-act="delete" data-id="${c.id}">Borrar</button>`
       const colorPicker =
@@ -59,6 +63,7 @@ function render() {
       return `<div class="cat-row">
         <span class="dot" style="background:${c.color}"></span>
         <span class="cat-name">${escape(c.name)}</span>
+        ${c.excluded ? '<span class="cat-nosum" title="No suma al total del mes">no suma</span>' : ''}
         <span class="cat-count">${c.count} ${c.count === 1 ? 'gasto' : 'gastos'}</span>
         ${acciones}
         ${colorPicker}
@@ -71,6 +76,7 @@ function render() {
     b.addEventListener('click', () => {
       if (b.dataset.act === 'rename') return rename(cat)
       if (b.dataset.act === 'delete') return remove(cat)
+      if (b.dataset.act === 'sum') return toggleSum(cat)
       if (b.dataset.act === 'color') {
         editingColorId = editingColorId === cat.id ? null : cat.id
         render()
@@ -101,6 +107,16 @@ async function rename(cat) {
   if (!nuevo || nuevo.trim() === cat.name) return
   try {
     await api(`/api/categories/${cat.id}`, { method: 'PATCH', body: JSON.stringify({ name: nuevo.trim() }) })
+    load()
+  } catch (e) {
+    alert(e.message)
+  }
+}
+
+// Togglea si la categoría suma o no al total del mes (excluded).
+async function toggleSum(cat) {
+  try {
+    await api(`/api/categories/${cat.id}`, { method: 'PATCH', body: JSON.stringify({ excluded: !cat.excluded }) })
     load()
   } catch (e) {
     alert(e.message)

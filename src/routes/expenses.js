@@ -11,8 +11,11 @@ export function expensesRouter({ db }) {
     const udb = db.forUser(req.userId)
     const month = req.query.month || defaultMonth()
     const expenses = udb.list(month)
+    // Las categorías con excluded=1 se ven en la lista pero no suman al total.
+    const excluded = new Set(udb.listCategories().filter((c) => c.excluded).map((c) => c.name))
     const totals = {}
     for (const e of expenses) {
+      if (excluded.has(e.category)) continue
       totals[e.category] = (totals[e.category] || 0) + e.amount
     }
     res.json({ month, expenses, totals })

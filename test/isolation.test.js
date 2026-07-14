@@ -35,11 +35,11 @@ describe('aislamiento entre usuarios', () => {
     expect(db.forUser(B.id).getExpense(bExpenseId).category).toBe('Transporte')
   })
 
-  it('cada usuario tiene sus propias 8 categorías, independientes', async () => {
+  it('cada usuario tiene sus propias 9 categorías seed, independientes', async () => {
     db.forUser(A.id).createCategory({ name: 'Hobbies', color: '#123456' })
     expect(db.forUser(A.id).listCategories().some((c) => c.name === 'Hobbies')).toBe(true)
     expect(db.forUser(B.id).listCategories().some((c) => c.name === 'Hobbies')).toBe(false)
-    expect(db.forUser(B.id).listCategories()).toHaveLength(8)
+    expect(db.forUser(B.id).listCategories()).toHaveLength(9)
   })
 
   it('rename de "Comida" en A no toca categorías ni gastos de B', () => {
