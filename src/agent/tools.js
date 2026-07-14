@@ -50,7 +50,7 @@ export function buildTools(db) {
     },
     {
       name: 'registrar_comercio',
-      description: 'Registra un comercio/CUIT recurrente para que se autoclasifique a futuro y clasifica los pendientes que matcheen. El "match" debe ser específico (CUIT o parte distintiva del comercio), NUNCA genérico como "Transferencia".',
+      description: 'Registra un comercio/CUIT recurrente: aprende la regla y re-clasifica TODOS los gastos de ese comercio que matcheen, incluidos los ya categorizados antes (pisa el histórico), no solo los pendientes. El "match" debe ser específico (CUIT o parte distintiva del comercio), NUNCA genérico como "Transferencia".',
       input_schema: {
         type: 'object',
         properties: {
