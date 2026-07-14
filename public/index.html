@@ -18,17 +18,19 @@
       <form id="login-form" class="login-form" novalidate>
         <h1 class="wordmark">gastaker<span class="caret">_</span></h1>
         <p class="login-sub">Tus gastos, anotados solos.</p>
+        <label class="field" style="margin-bottom: 10px">
+          <input id="email" type="email" placeholder="Email" autocomplete="username" autofocus />
+        </label>
         <label class="field">
           <input
             id="password"
             type="password"
             placeholder="Contraseña"
             autocomplete="current-password"
-            autofocus
           />
           <button type="submit" aria-label="Entrar">→</button>
         </label>
-        <p id="login-error" class="login-error hidden">Clave incorrecta</p>
+        <p id="login-error" class="login-error hidden">Email o clave incorrectos</p>
       </form>
     </main>
 
@@ -45,6 +47,8 @@
           <button id="menu-btn" class="step" aria-label="Menú" aria-expanded="false">☰</button>
           <nav id="mainmenu" class="mainmenu hidden">
             <a href="/categorias.html">Categorías</a>
+            <a href="/ajustes.html">Ajustes</a>
+            <a href="#" id="logout">Salir</a>
           </nav>
         </div>
       </header>

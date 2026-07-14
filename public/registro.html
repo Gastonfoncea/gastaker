@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gastaker · registro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="login">
+      <form id="reg-form" class="login-form" novalidate>
+        <h1 class="wordmark">gastaker<span class="caret">_</span></h1>
+        <p id="reg-sub" class="login-sub">Creá tu cuenta.</p>
+
+        <div id="reg-fields">
+          <label class="field" style="margin-bottom: 10px">
+            <input id="reg-email" type="email" placeholder="Email" autocomplete="username" autofocus />
+          </label>
+          <label class="field">
+            <input id="reg-password" type="password" placeholder="Contraseña" autocomplete="new-password" />
+            <button type="submit" aria-label="Crear cuenta">→</button>
+          </label>
+          <p id="reg-error" class="login-error hidden"></p>
+        </div>
+
+        <p id="reg-invalid" class="login-error hidden">Invitación inválida o vencida.</p>
+      </form>
+    </main>
+
+    <script src="/registro.js"></script>
+  </body>
+</html>

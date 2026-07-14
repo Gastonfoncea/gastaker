@@ -236,7 +236,7 @@ window.addEventListener('scroll', closeMenu, true)
 function showLogin() {
   $('#login').classList.remove('hidden')
   $('#app').classList.add('hidden')
-  $('#password')?.focus()
+  $('#email')?.focus()
 }
 function showApp() {
   $('#login').classList.add('hidden')
@@ -287,7 +287,7 @@ $('#login-form').addEventListener('submit', async (ev) => {
   const res = await fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password: $('#password').value }),
+    body: JSON.stringify({ email: $('#email').value.trim(), password: $('#password').value }),
   })
   if (res.ok) {
     $('#login-error').classList.add('hidden')
@@ -296,6 +296,13 @@ $('#login-form').addEventListener('submit', async (ev) => {
     $('#login-error').classList.remove('hidden')
     $('#password').value = ''
   }
+})
+
+// Salir: cierra la sesión en el server y vuelve al login.
+$('#logout').addEventListener('click', async (ev) => {
+  ev.preventDefault()
+  await fetch('/api/logout', { method: 'POST' })
+  showLogin()
 })
 
 load()

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gastaker · ajustes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header class="topbar">
+        <a class="wordmark sm" href="/" style="text-decoration: none">gastaker<span class="caret">_</span></a>
+        <span class="overline">Ajustes</span>
+      </header>
+
+      <section class="ledger">
+        <!-- Token de ingesta -->
+        <div class="setting">
+          <span class="overline">Token de Ingesta</span>
+          <p class="muted">
+            Pegalo en el Apps Script (constante <code>INGEST_TOKEN</code>) para que tus mails de
+            Santander caigan en tu cuenta.
+          </p>
+          <div class="io-row">
+            <input id="ingest-token" type="text" readonly value="…" />
+            <button id="copy-token" class="btn ghost" type="button">Copiar</button>
+          </div>
+        </div>
+
+        <!-- WhatsApp -->
+        <form id="wa-form" class="setting">
+          <span class="overline">WhatsApp</span>
+          <p class="muted">
+            Tu número, formato internacional sin <code>+</code> (ej. 5491122334455). Los mensajes
+            desde ahí corren el agente sobre tus datos.
+          </p>
+          <div class="io-row">
+            <input id="wa-number" type="text" placeholder="5491122334455" inputmode="numeric" />
+            <button type="submit" class="btn">Guardar</button>
+          </div>
+          <p id="wa-msg" class="hidden"></p>
+        </form>
+
+        <!-- Invitar (solo admin) -->
+        <div id="invite-block" class="setting hidden">
+          <span class="overline">Invitar amigo</span>
+          <p class="muted">Generá un link de un solo uso. Vence en 7 días.</p>
+          <button id="invite-btn" class="btn" type="button">Generar link</button>
+          <div id="invite-result" class="io-row hidden" style="margin-top: 12px">
+            <input id="invite-url" type="text" readonly />
+            <button id="copy-invite" class="btn ghost" type="button">Copiar</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="/ajustes.js"></script>
+  </body>
+</html>
