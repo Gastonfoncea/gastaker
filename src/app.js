@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { ingestRouter } from './routes/ingest.js'
-import { loginHandler } from './auth.js'
+import { loginHandler, logoutHandler } from './auth.js'
 import { expensesRouter } from './routes/expenses.js'
 import { categoriesRouter } from './routes/categories.js'
 import { whatsappRouter } from './routes/whatsapp.js'
@@ -23,11 +23,12 @@ export function createApp({ db, config }) {
   app.use(cookieParser())
 
   const memory = createMemory()
-  app.use('/api/ingest', ingestRouter({ db, config }))
+  app.use('/api/ingest', ingestRouter({ db }))
   app.use('/api/whatsapp', whatsappRouter({ config, db, memory }))
-  app.post('/api/login', loginHandler({ config }))
-  app.use('/api/expenses', expensesRouter({ db, config }))
-  app.use('/api/categories', categoriesRouter({ db, config }))
+  app.post('/api/login', loginHandler({ db }))
+  app.post('/api/logout', logoutHandler({ db }))
+  app.use('/api/expenses', expensesRouter({ db }))
+  app.use('/api/categories', categoriesRouter({ db }))
 
   // Sirve el frontend estático (HTML/CSS/JS no contienen datos sensibles).
   app.use(express.static(join(__dirname, '..', 'public')))

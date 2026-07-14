@@ -20,13 +20,14 @@ export function whatsappRouter({ config, send = sendWhatsApp, runAgent = realRun
     const from = msg?.from
     const text = msg?.text?.body
     if (!from || !text) return
-    // Solo el número autorizado (son finanzas personales).
-    if (from !== config.allowedNumber) return
+    // El número entrante resuelve a un usuario; si no matchea ninguno, se ignora.
+    const user = db.getUserByWhatsappNumber(from)
+    if (!user) return
 
     try {
       const history = memory.load(from)
       const messages = [...history, { role: 'user', content: text }]
-      const tools = buildTools(db)
+      const tools = buildTools(db.forUser(user.id))
       const today = new Date().toISOString().slice(0, 10)
       const reply = await runAgent({
         model: config.anthropicModel,

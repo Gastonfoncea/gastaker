@@ -2,17 +2,18 @@
 import express from 'express'
 import { parseEmail } from '../sources/index.js'
 import { categorize } from '../categorizer.js'
-import { avisarSinClasificar } from '../agent/notifier.js'
 
-// Crea el router de ingesta. Valida el secreto del webhook contra config.
-export function ingestRouter({ db, config }) {
+// Crea el router de ingesta. El header X-Webhook-Secret trae el ingest_token del
+// usuario, que resuelve a qué cuenta pertenece el gasto.
+export function ingestRouter({ db }) {
   const router = express.Router()
 
   router.post('/', (req, res) => {
-    const secret = req.get('X-Webhook-Secret')
-    if (!secret || secret !== config.webhookSecret) {
-      return res.status(401).json({ error: 'secreto inválido' })
+    const user = db.getUserByIngestToken(req.get('X-Webhook-Secret'))
+    if (!user) {
+      return res.status(401).json({ error: 'token inválido' })
     }
+    const udb = db.forUser(user.id)
 
     const { messageId, body, receivedAt } = req.body || {}
     if (!messageId || !body) {
@@ -28,7 +29,7 @@ export function ingestRouter({ db, config }) {
     let category
     let needsReview = 0
     if (parsed.kind === 'transferencia') {
-      const learned = db.findLearned(parsed.merchant)
+      const learned = udb.findLearned(parsed.merchant)
       category = learned || 'Transferencias'
       needsReview = learned ? 0 : 1
     } else {
@@ -36,7 +37,7 @@ export function ingestRouter({ db, config }) {
       if (byRule !== 'Otros') {
         category = byRule
       } else {
-        const learned = db.findLearned(parsed.merchant)
+        const learned = udb.findLearned(parsed.merchant)
         category = learned || 'Otros'
         needsReview = learned ? 0 : 1
       }
@@ -47,7 +48,7 @@ export function ingestRouter({ db, config }) {
     const occurred_at =
       parsed.occurredAt || normalizeReceived(receivedAt) || new Date().toISOString().slice(0, 19)
 
-    const { inserted } = db.insert({
+    const { inserted } = udb.insert({
       gmail_message_id: messageId,
       amount: parsed.amount,
       merchant: parsed.merchant,
@@ -58,14 +59,6 @@ export function ingestRouter({ db, config }) {
       source: parsed.source,
       needs_review: needsReview,
     })
-
-    if (inserted && needsReview && config.pushEnabled) {
-      // No bloquea la respuesta del webhook (no se hace await).
-      avisarSinClasificar(
-        { merchant: parsed.merchant, amount: parsed.amount, currency: parsed.currency },
-        { enabled: true, to: config.notifyWhatsapp }
-      )
-    }
 
     return res.json({ inserted, category, currency: parsed.currency, source: parsed.source })
   })
