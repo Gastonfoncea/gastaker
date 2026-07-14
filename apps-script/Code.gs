@@ -1,10 +1,10 @@
 // Gastaker — poller de Gmail.
 // Pegá este archivo en https://script.google.com (proyecto nuevo),
-// completá las 3 constantes, autorizalo, y poné un trigger de tiempo
-// (cada 5 min) sobre la función sync.
+// completá WEBHOOK_URL e INGEST_TOKEN (este último lo copiás desde Ajustes en
+// la web), autorizalo, y poné un trigger de tiempo (cada 5 min) sobre sync.
 
 const WEBHOOK_URL = 'https://TU-DOMINIO-O-IP/api/ingest' // ej: https://gastaker.tudominio.com/api/ingest
-const WEBHOOK_SECRET = 'PEGA-ACA-EL-MISMO-WEBHOOK_SECRET-DEL-VPS'
+const INGEST_TOKEN = 'PEGA-ACA-TU-TOKEN-DE-INGESTA' // lo copiás desde Ajustes en la web
 const SENDER = 'mensajesyavisos@mails.santander.com.ar'
 const LABEL_NAME = 'gastaker-procesado'
 
@@ -25,7 +25,7 @@ function sync() {
       const res = UrlFetchApp.fetch(WEBHOOK_URL, {
         method: 'post',
         contentType: 'application/json',
-        headers: { 'X-Webhook-Secret': WEBHOOK_SECRET },
+        headers: { 'X-Webhook-Secret': INGEST_TOKEN },
         payload: JSON.stringify(payload),
         muteHttpExceptions: true,
       })
