@@ -108,13 +108,25 @@ describe('db', () => {
     expect(row.needs_review).toBe(0)
   })
 
-  it('registrarComercio guarda la regla y clasifica los pendientes que matchean', () => {
+  it('registrarComercio guarda la regla y re-clasifica los que matchean', () => {
     db.insert(sampleRecord({ gmail_message_id: 't', merchant: 'Transferencia · 999', category: 'Transferencias', needs_review: 1 }))
     const r = db.registrarComercio({ match: '999', categoria: 'Vivienda', alias: 'Alquiler' })
     expect(r.inserted).toBe(true)
-    expect(r.pendientesActualizados).toBe(1)
+    expect(r.actualizados).toBe(1)
     expect(db.list('2026-06')[0].category).toBe('Vivienda')
     expect(db.list('2026-06')[0].needs_review).toBe(0)
+  })
+
+  it('registrarComercio pisa también el histórico ya categorizado', () => {
+    // Un gasto viejo, ya categorizado (needs_review = 0), del mismo comercio.
+    db.insert(sampleRecord({ gmail_message_id: 'viejo', merchant: 'PAYU*AR*UBER', category: 'Otros', needs_review: 0 }))
+    db.insert(sampleRecord({ gmail_message_id: 'pend', merchant: 'PAYU*AR*UBER', category: 'Otros', needs_review: 1 }))
+    const r = db.registrarComercio({ match: 'PAYU*AR*UBER', categoria: 'Transporte' })
+    expect(r.actualizados).toBe(2)
+    for (const row of db.list('2026-06')) {
+      expect(row.category).toBe('Transporte')
+      expect(row.needs_review).toBe(0)
+    }
   })
 
   it('registrarComercio rechaza un match genérico o muy corto', () => {

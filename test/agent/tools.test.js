@@ -30,7 +30,7 @@ describe('buildTools (read)', () => {
     expect(r.error).toBeTruthy()
   })
 
-  it('execute(registrar_comercio) guarda y devuelve pendientesActualizados', async () => {
+  it('execute(registrar_comercio) guarda la regla y devuelve actualizados', async () => {
     const r = await tools.execute('registrar_comercio', { match: 'NETFLIX', categoria: 'Suscripciones' })
     expect(r.inserted).toBe(true)
   })

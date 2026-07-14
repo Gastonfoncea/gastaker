@@ -148,7 +148,9 @@ export function createDb(path) {
       )
     },
 
-    // Registra un comercio/CUIT aprendido y clasifica los gastos PENDIENTES que matcheen.
+    // Registra un comercio/CUIT aprendido y re-clasifica TODOS los gastos que
+    // matcheen (histórico incluido): "registrar" significa que ese comercio ES
+    // esa categoría, siempre.
     registrarComercio({ match, categoria, alias = null }) {
       const m = (match || '').trim()
       const BLACKLIST = ['transferencia', 'pago', 'compra', 'consumo', 'debito', 'credito']
@@ -159,9 +161,9 @@ export function createDb(path) {
         .prepare('INSERT OR REPLACE INTO comercios_conocidos (match, category, alias) VALUES (@m, @categoria, @alias)')
         .run({ m, categoria, alias })
       const upd = sqlite
-        .prepare("UPDATE expenses SET category = @categoria, needs_review = 0 WHERE needs_review = 1 AND upper(merchant) LIKE '%' || upper(@m) || '%'")
+        .prepare("UPDATE expenses SET category = @categoria, needs_review = 0 WHERE upper(merchant) LIKE '%' || upper(@m) || '%'")
         .run({ m, categoria })
-      return { inserted: true, pendientesActualizados: upd.changes }
+      return { inserted: true, actualizados: upd.changes }
     },
 
     _raw: sqlite,
