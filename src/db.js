@@ -1,5 +1,6 @@
 // src/db.js
 import Database from 'better-sqlite3'
+import { hashPassword, verifyPassword, randomToken } from './crypto.js'
 
 // createDb(path) inicializa el esquema y devuelve la API de la base.
 // path puede ser ':memory:' (tests) o una ruta a archivo (producción).
@@ -51,6 +52,34 @@ export function createDb(path) {
       name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
       color       TEXT NOT NULL,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `)
+
+  // --- Tablas de auth multi-usuario (aditivas; no tocan las tablas de datos) ---
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      email           TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+      password_hash   TEXT    NOT NULL,           -- "scrypt$<saltHex>$<hashHex>"
+      ingest_token    TEXT    NOT NULL UNIQUE,    -- randomToken(24), para el Apps Script
+      whatsapp_number TEXT    UNIQUE,             -- nullable; internacional sin '+'
+      is_admin        INTEGER NOT NULL DEFAULT 0, -- 1 = puede generar invitaciones
+      created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      token       TEXT    PRIMARY KEY,            -- randomToken(32)
+      user_id     INTEGER NOT NULL REFERENCES users(id),
+      expires_at  TEXT    NOT NULL,               -- now + 30 días
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS invites (
+      token       TEXT    PRIMARY KEY,            -- randomToken(24)
+      created_by  INTEGER NOT NULL REFERENCES users(id),
+      used_by     INTEGER REFERENCES users(id),   -- NULL = sin usar
+      expires_at  TEXT    NOT NULL,               -- now + 7 días
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `)
 
@@ -256,6 +285,126 @@ export function createDb(path) {
         sqlite.prepare('DELETE FROM categories WHERE id = ?').run(id)
       })()
       return { movidos }
+    },
+
+    // --- Usuarios / auth / sesiones / invites (nivel raíz, no scopeadas) ---
+
+    // Crea un usuario (hashea la password, genera ingest_token). isAdmin=true solo
+    // para el bootstrap. Lanza DUP si el email (o el whatsapp_number) ya existe.
+    // Nota: el seed de categorías por-usuario se agrega en la etapa de scoping.
+    createUser({ email, password, whatsappNumber = null, isAdmin = false } = {}) {
+      const e = (email || '').trim()
+      if (!e) fail('VALIDATION', 'falta el email')
+      if (!password) fail('VALIDATION', 'falta la password')
+      const wn = whatsappNumber ? String(whatsappNumber).trim() : null
+      const passwordHash = hashPassword(password)
+      const ingestToken = randomToken(24)
+      let info
+      try {
+        info = sqlite
+          .prepare(
+            'INSERT INTO users (email, password_hash, ingest_token, whatsapp_number, is_admin) VALUES (?, ?, ?, ?, ?)'
+          )
+          .run(e, passwordHash, ingestToken, wn || null, isAdmin ? 1 : 0)
+      } catch (err) {
+        if (String(err.code || '').includes('CONSTRAINT')) {
+          if (String(err.message).includes('users.whatsapp_number')) fail('DUP', 'ese número ya está en uso')
+          fail('DUP', `ya existe un usuario con el email "${e}"`)
+        }
+        throw err
+      }
+      return { id: info.lastInsertRowid, email: e, ingest_token: ingestToken, whatsapp_number: wn || null, is_admin: isAdmin ? 1 : 0 }
+    },
+
+    // Devuelve la fila del usuario si email+password validan; si no, null.
+    authenticate(email, password) {
+      const row = sqlite.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE').get((email || '').trim())
+      if (!row) return null
+      return verifyPassword(password, row.password_hash) ? row : null
+    },
+
+    getUserById(id) {
+      return sqlite.prepare('SELECT * FROM users WHERE id = ?').get(id)
+    },
+    getUserByEmail(email) {
+      return sqlite.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE').get((email || '').trim())
+    },
+    getUserByIngestToken(token) {
+      if (!token) return undefined
+      return sqlite.prepare('SELECT * FROM users WHERE ingest_token = ?').get(token)
+    },
+    // Nunca matchea NULL/vacío: un número no registrado no resuelve a ningún user.
+    getUserByWhatsappNumber(number) {
+      const n = number == null ? '' : String(number).trim()
+      if (!n) return undefined
+      return sqlite.prepare('SELECT * FROM users WHERE whatsapp_number = ?').get(n)
+    },
+
+    // Actualiza el whatsapp_number (nullable). Lanza DUP si ya está en otro user.
+    updateUser(id, { whatsappNumber } = {}) {
+      const wn = whatsappNumber == null || String(whatsappNumber).trim() === '' ? null : String(whatsappNumber).trim()
+      try {
+        sqlite.prepare('UPDATE users SET whatsapp_number = ? WHERE id = ?').run(wn, id)
+      } catch (err) {
+        if (String(err.code || '').includes('CONSTRAINT')) fail('DUP', 'ese número ya está en uso')
+        throw err
+      }
+      return { whatsapp_number: wn }
+    },
+
+    createSession(userId) {
+      const token = randomToken(32)
+      sqlite
+        .prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+30 days'))")
+        .run(token, userId)
+      const row = sqlite.prepare('SELECT expires_at FROM sessions WHERE token = ?').get(token)
+      return { token, expires_at: row.expires_at }
+    },
+
+    // Devuelve { user_id, expires_at } si la sesión está vigente, o null.
+    // Limpieza oportunista: borra todas las sesiones vencidas en cada llamada.
+    getSession(token) {
+      if (!token) return null
+      sqlite.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run()
+      return sqlite.prepare('SELECT user_id, expires_at FROM sessions WHERE token = ?').get(token) || null
+    },
+
+    deleteSession(token) {
+      if (!token) return
+      sqlite.prepare('DELETE FROM sessions WHERE token = ?').run(token)
+    },
+
+    createInvite(createdBy) {
+      const token = randomToken(24)
+      sqlite
+        .prepare("INSERT INTO invites (token, created_by, expires_at) VALUES (?, ?, datetime('now', '+7 days'))")
+        .run(token, createdBy)
+      const row = sqlite.prepare('SELECT expires_at FROM invites WHERE token = ?').get(token)
+      return { token, expires_at: row.expires_at }
+    },
+
+    // { valid:true } o { valid:false, reason: 'not_found'|'used'|'expired' }.
+    getInvite(token) {
+      const row = sqlite
+        .prepare("SELECT used_by, (expires_at < datetime('now')) AS expired FROM invites WHERE token = ?")
+        .get(token)
+      if (!row) return { valid: false, reason: 'not_found' }
+      if (row.used_by != null) return { valid: false, reason: 'used' }
+      if (row.expired) return { valid: false, reason: 'expired' }
+      return { valid: true }
+    },
+
+    // Marca el invite como usado. Lanza INVITE_INVALID si no existe / ya usado / vencido.
+    useInvite(token, userId) {
+      sqlite.transaction(() => {
+        const row = sqlite
+          .prepare("SELECT used_by, (expires_at < datetime('now')) AS expired FROM invites WHERE token = ?")
+          .get(token)
+        if (!row) fail('INVITE_INVALID', 'invitación inexistente')
+        if (row.used_by != null) fail('INVITE_INVALID', 'invitación ya usada')
+        if (row.expired) fail('INVITE_INVALID', 'invitación vencida')
+        sqlite.prepare('UPDATE invites SET used_by = ? WHERE token = ?').run(userId, token)
+      })()
     },
 
     _raw: sqlite,
