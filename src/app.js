@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { ingestRouter } from './routes/ingest.js'
 import { loginHandler } from './auth.js'
 import { expensesRouter } from './routes/expenses.js'
+import { categoriesRouter } from './routes/categories.js'
 import { whatsappRouter } from './routes/whatsapp.js'
 import { createMemory } from './agent/memory.js'
 
@@ -26,6 +27,7 @@ export function createApp({ db, config }) {
   app.use('/api/whatsapp', whatsappRouter({ config, db, memory }))
   app.post('/api/login', loginHandler({ config }))
   app.use('/api/expenses', expensesRouter({ db, config }))
+  app.use('/api/categories', categoriesRouter({ db, config }))
 
   // Sirve el frontend estático (HTML/CSS/JS no contienen datos sensibles).
   app.use(express.static(join(__dirname, '..', 'public')))
