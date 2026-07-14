@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>gastaker · categorías</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header class="topbar">
+        <a class="wordmark sm" href="/" style="text-decoration: none">gastaker<span class="caret">_</span></a>
+        <span class="overline">Categorías</span>
+      </header>
+
+      <section class="ledger">
+        <form id="new-cat" class="newcat">
+          <input id="new-name" type="text" placeholder="Nueva categoría" maxlength="30" required />
+          <div id="palette" class="palette"></div>
+          <button type="submit">Crear</button>
+          <p id="form-error" class="login-error hidden"></p>
+        </form>
+
+        <div id="cats" class="cats"></div>
+      </section>
+    </div>
+
+    <script src="/categorias.js"></script>
+  </body>
+</html>

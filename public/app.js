@@ -256,6 +256,16 @@ $('#next').addEventListener('click', () => {
 
 $('#cat-filter').onchange = (ev) => setFilter(ev.target.value)
 
+// menú hamburguesa
+const menuBtn = $('#menu-btn')
+const mainMenu = $('#mainmenu')
+menuBtn.addEventListener('click', (ev) => {
+  ev.stopPropagation()
+  const open = mainMenu.classList.toggle('hidden')
+  menuBtn.setAttribute('aria-expanded', String(!open))
+})
+document.addEventListener('click', () => mainMenu.classList.add('hidden'))
+
 /* Auto-refresh al volver a la app: entrás (volvés a la pestaña o a la ventana)
    y se actualiza sola, sin polling. Preserva el mes y el filtro activo. */
 let lastRefresh = 0
