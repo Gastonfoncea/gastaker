@@ -43,10 +43,10 @@ describe('db', () => {
     expect(db.list('2026-07')).toHaveLength(1)
   })
 
-  it('actualiza la categoría de un gasto', () => {
+  it('clasificarGasto actualiza la categoría de un gasto', () => {
     db.insert(sampleRecord())
     const id = db.list('2026-06')[0].id
-    const changed = db.updateCategory(id, 'Supermercado')
+    const changed = db.clasificarGasto(id, 'Supermercado')
     expect(changed).toBe(true)
     expect(db.list('2026-06')[0].category).toBe('Supermercado')
   })

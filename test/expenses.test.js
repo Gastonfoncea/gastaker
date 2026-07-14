@@ -77,7 +77,7 @@ describe('GET /api/expenses', () => {
 })
 
 describe('PATCH /api/expenses/:id', () => {
-  it('cambia la categoría de un gasto', async () => {
+  it('cambia la categoría de un gasto y limpia needs_review', async () => {
     const app = makeApp()
     await seedExpense(app)
     const agent = await authedAgent(app)
@@ -87,5 +87,62 @@ describe('PATCH /api/expenses/:id', () => {
     expect(res.status).toBe(200)
     const after = await agent.get('/api/expenses?month=2026-06')
     expect(after.body.expenses[0].category).toBe('Supermercado')
+    expect(after.body.expenses[0].needs_review).toBe(0)
+  })
+
+  it('sin learn NO toca otros gastos del mismo comercio', async () => {
+    const db = createDb(':memory:')
+    const app = createApp({ db, config: CONFIG })
+    db.insert({ gmail_message_id: 'a', amount: 100, merchant: 'PAYU*AR*UBER', category: 'Otros', occurred_at: '2026-06-01T10:00:00' })
+    db.insert({ gmail_message_id: 'b', amount: 200, merchant: 'PAYU*AR*UBER', category: 'Otros', occurred_at: '2026-06-02T10:00:00' })
+    const agent = await authedAgent(app)
+    const list = await agent.get('/api/expenses?month=2026-06')
+    const [first, second] = list.body.expenses // orden: más reciente primero
+    await agent.patch(`/api/expenses/${first.id}`).send({ category: 'Transporte' })
+    const after = await agent.get('/api/expenses?month=2026-06')
+    const otro = after.body.expenses.find((e) => e.id === second.id)
+    expect(otro.category).toBe('Otros')
+  })
+
+  it('con learn aprende la regla y pisa todos los gastos del comercio', async () => {
+    const db = createDb(':memory:')
+    const app = createApp({ db, config: CONFIG })
+    db.insert({ gmail_message_id: 'a', amount: 100, merchant: 'PAYU*AR*UBER', category: 'Otros', occurred_at: '2026-06-01T10:00:00' })
+    db.insert({ gmail_message_id: 'b', amount: 200, merchant: 'PAYU*AR*UBER', category: 'Otros', occurred_at: '2026-06-02T10:00:00', needs_review: 1 })
+    const agent = await authedAgent(app)
+    const list = await agent.get('/api/expenses?month=2026-06')
+    const id = list.body.expenses[0].id
+    const res = await agent.patch(`/api/expenses/${id}`).send({ category: 'Transporte', learn: true })
+    expect(res.status).toBe(200)
+    expect(res.body.actualizados).toBe(2)
+    const after = await agent.get('/api/expenses?month=2026-06')
+    for (const e of after.body.expenses) {
+      expect(e.category).toBe('Transporte')
+      expect(e.needs_review).toBe(0)
+    }
+    // La regla quedó aprendida.
+    expect(db.findLearned('PAYU*AR*UBER')).toBe('Transporte')
+  })
+
+  it('con learn y un merchant no registrable (genérico) devuelve 400', async () => {
+    const db = createDb(':memory:')
+    const app = createApp({ db, config: CONFIG })
+    // "Transferencia" pelado está en la blacklist de registrarComercio.
+    db.insert({ gmail_message_id: 'a', amount: 100, merchant: 'Transferencia', category: 'Otros', occurred_at: '2026-06-01T10:00:00' })
+    const agent = await authedAgent(app)
+    const list = await agent.get('/api/expenses?month=2026-06')
+    const id = list.body.expenses[0].id
+    const res = await agent.patch(`/api/expenses/${id}`).send({ category: 'Comida', learn: true })
+    expect(res.status).toBe(400)
+    // El gasto individual tampoco se tocó (la operación es atómica de cara al usuario).
+    const after = await agent.get('/api/expenses?month=2026-06')
+    expect(after.body.expenses[0].category).toBe('Otros')
+  })
+
+  it('gasto inexistente devuelve 404', async () => {
+    const app = makeApp()
+    const agent = await authedAgent(app)
+    const res = await agent.patch('/api/expenses/9999').send({ category: 'Comida' })
+    expect(res.status).toBe(404)
   })
 })

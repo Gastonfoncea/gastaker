@@ -58,10 +58,6 @@ export function createDb(path) {
     ORDER BY occurred_at DESC
   `)
 
-  const updateStmt = sqlite.prepare(`
-    UPDATE expenses SET category = @category WHERE id = @id
-  `)
-
   return {
     // Devuelve { inserted: boolean }. false si el gmail_message_id ya existía.
     insert(record) {
@@ -72,9 +68,9 @@ export function createDb(path) {
     list(month) {
       return listStmt.all({ prefix: `${month}%` })
     },
-    // Devuelve true si actualizó alguna fila.
-    updateCategory(id, category) {
-      return updateStmt.run({ id, category }).changes > 0
+    // Fila completa de un gasto por id, o undefined si no existe.
+    getExpense(id) {
+      return sqlite.prepare('SELECT * FROM expenses WHERE id = ?').get(id)
     },
 
     // Resumen del mes: total ARS, total USD, y desglose ARS por categoría (neto > 0).

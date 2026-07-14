@@ -17,14 +17,29 @@ export function expensesRouter({ db, config }) {
     res.json({ month, expenses, totals })
   })
 
-  // PATCH /api/expenses/:id  { category }
+  // PATCH /api/expenses/:id  { category, learn? }
+  // learn: además de clasificar este gasto, aprende "merchant -> category"
+  // y re-clasifica todos los gastos de ese comercio (histórico incluido).
   router.patch('/:id', (req, res) => {
     const id = Number.parseInt(req.params.id, 10)
-    const { category } = req.body || {}
+    const { category, learn } = req.body || {}
     if (!category) return res.status(400).json({ error: 'falta category' })
-    const ok = db.updateCategory(id, category)
-    if (!ok) return res.status(404).json({ error: 'no encontrado' })
-    res.json({ ok: true })
+    const expense = db.getExpense(id)
+    if (!expense) return res.status(404).json({ error: 'no encontrado' })
+
+    if (learn) {
+      // registrarComercio valida el match (blacklist / largo mínimo) y ya
+      // re-clasifica este mismo gasto, porque su merchant se contiene a sí mismo.
+      try {
+        const r = db.registrarComercio({ match: expense.merchant, categoria: category })
+        return res.json({ ok: true, actualizados: r.actualizados })
+      } catch (e) {
+        return res.status(400).json({ error: e.message })
+      }
+    }
+
+    db.clasificarGasto(id, category)
+    res.json({ ok: true, actualizados: 1 })
   })
 
   return router
