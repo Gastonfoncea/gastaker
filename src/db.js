@@ -45,6 +45,33 @@ export function createDb(path) {
     );
   `)
 
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      color       TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `)
+
+  // Seed idempotente: solo si la tabla está vacía (bases nuevas o migradas).
+  // Nombres y colores espejan el CATS histórico del frontend.
+  if (sqlite.prepare('SELECT COUNT(*) AS n FROM categories').get().n === 0) {
+    const seed = sqlite.prepare('INSERT INTO categories (name, color) VALUES (?, ?)')
+    for (const [name, color] of [
+      ['Comida', '#FF6B35'],
+      ['Supermercado', '#06B6D4'],
+      ['Transporte', '#4F46E5'],
+      ['Servicios', '#A855F7'],
+      ['Suscripciones', '#EC4899'],
+      ['Salud', '#10B981'],
+      ['Transferencias', '#F59E0B'],
+      ['Otros', '#64748B'],
+    ]) {
+      seed.run(name, color)
+    }
+  }
+
   const insertStmt = sqlite.prepare(`
     INSERT OR IGNORE INTO expenses
       (gmail_message_id, amount, merchant, category, card, occurred_at, currency, source, needs_review)
@@ -57,6 +84,14 @@ export function createDb(path) {
     WHERE occurred_at LIKE @prefix
     ORDER BY occurred_at DESC
   `)
+
+  // Error con código, para que las rutas mapeen a status HTTP sin parsear mensajes.
+  const fail = (code, message) => {
+    const e = new Error(message)
+    e.code = code
+    throw e
+  }
+  const COLOR_RE = /^#[0-9a-fA-F]{6}$/
 
   return {
     // Devuelve { inserted: boolean }. false si el gmail_message_id ya existía.
@@ -160,6 +195,67 @@ export function createDb(path) {
         .prepare("UPDATE expenses SET category = @categoria, needs_review = 0 WHERE upper(merchant) LIKE '%' || upper(@m) || '%'")
         .run({ m, categoria })
       return { inserted: true, actualizados: upd.changes }
+    },
+
+    listCategories() {
+      return sqlite
+        .prepare(`
+          SELECT c.id, c.name, c.color,
+                 (SELECT COUNT(*) FROM expenses e WHERE e.category = c.name) AS count
+          FROM categories c ORDER BY c.id
+        `)
+        .all()
+    },
+
+    createCategory({ name, color }) {
+      const n = (name || '').trim()
+      if (!n) fail('VALIDATION', 'falta el nombre')
+      if (!COLOR_RE.test(color || '')) fail('VALIDATION', 'color inválido (formato #RRGGBB)')
+      if (sqlite.prepare('SELECT 1 FROM categories WHERE name = ? COLLATE NOCASE').get(n)) {
+        fail('DUP', `ya existe la categoría "${n}"`)
+      }
+      const info = sqlite.prepare('INSERT INTO categories (name, color) VALUES (?, ?)').run(n, color)
+      return { id: info.lastInsertRowid, name: n, color }
+    },
+
+    // Renombrar cascadea por nombre a expenses y comercios_conocidos.
+    // "Otros" no se renombra (es el fallback del categorizador y del delete).
+    updateCategoryDef(id, { name, color } = {}) {
+      const row = sqlite.prepare('SELECT * FROM categories WHERE id = ?').get(id)
+      if (!row) fail('NOT_FOUND', 'categoría no encontrada')
+      const newName = name === undefined ? row.name : (name || '').trim()
+      const newColor = color === undefined ? row.color : color
+      if (!newName) fail('VALIDATION', 'falta el nombre')
+      if (!COLOR_RE.test(newColor)) fail('VALIDATION', 'color inválido (formato #RRGGBB)')
+      if (row.name === 'Otros' && newName !== 'Otros') fail('PROTECTED', '"Otros" no se puede renombrar')
+      if (
+        newName.toLowerCase() !== row.name.toLowerCase() &&
+        sqlite.prepare('SELECT 1 FROM categories WHERE name = ? COLLATE NOCASE').get(newName)
+      ) {
+        fail('DUP', `ya existe la categoría "${newName}"`)
+      }
+      sqlite.transaction(() => {
+        if (newName !== row.name) {
+          sqlite.prepare('UPDATE expenses SET category = ? WHERE category = ?').run(newName, row.name)
+          sqlite.prepare('UPDATE comercios_conocidos SET category = ? WHERE category = ?').run(newName, row.name)
+        }
+        sqlite.prepare('UPDATE categories SET name = ?, color = ? WHERE id = ?').run(newName, newColor, id)
+      })()
+      return { id, name: newName, color: newColor }
+    },
+
+    // Borra la categoría: sus gastos pasan a "Otros" y sus reglas aprendidas se van.
+    deleteCategory(id) {
+      const row = sqlite.prepare('SELECT * FROM categories WHERE id = ?').get(id)
+      if (!row) fail('NOT_FOUND', 'categoría no encontrada')
+      if (row.name === 'Otros') fail('PROTECTED', '"Otros" no se puede borrar')
+      let movidos = 0
+      sqlite.transaction(() => {
+        movidos = sqlite.prepare("UPDATE expenses SET category = 'Otros' WHERE category = ?").run(row.name).changes
+        sqlite.prepare('DELETE FROM comercios_conocidos WHERE category = ?').run(row.name)
+        sqlite.prepare('DELETE FROM categories WHERE id = ?').run(id)
+      })()
+      return { movidos }
     },
 
     _raw: sqlite,

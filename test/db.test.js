@@ -133,4 +133,82 @@ describe('db', () => {
     expect(() => db.registrarComercio({ match: 'transferencia', categoria: 'X' })).toThrow()
     expect(() => db.registrarComercio({ match: 'ab', categoria: 'X' })).toThrow()
   })
+
+  // Devuelve el e.code del error que lanza fn, o null si no lanzó.
+  const codeOf = (fn) => {
+    try {
+      fn()
+      return null
+    } catch (e) {
+      return e.code
+    }
+  }
+
+  describe('categorías', () => {
+    it('seedea las 8 categorías iniciales con color', () => {
+      const cats = db.listCategories()
+      expect(cats.map((c) => c.name)).toEqual([
+        'Comida', 'Supermercado', 'Transporte', 'Servicios',
+        'Suscripciones', 'Salud', 'Transferencias', 'Otros',
+      ])
+      expect(cats[0].color).toBe('#FF6B35')
+      expect(cats[0].count).toBe(0)
+    })
+
+    it('listCategories cuenta los gastos de cada categoría', () => {
+      db.insert(sampleRecord({ gmail_message_id: 'a' })) // Comida
+      db.insert(sampleRecord({ gmail_message_id: 'b' })) // Comida
+      const comida = db.listCategories().find((c) => c.name === 'Comida')
+      expect(comida.count).toBe(2)
+    })
+
+    it('createCategory crea con nombre y color válidos', () => {
+      const c = db.createCategory({ name: 'Ropa', color: '#EF4444' })
+      expect(c.id).toBeTruthy()
+      expect(db.listCategories().some((x) => x.name === 'Ropa')).toBe(true)
+    })
+
+    it('createCategory rechaza duplicados (case-insensitive) con code DUP', () => {
+      expect(codeOf(() => db.createCategory({ name: 'comida', color: '#EF4444' }))).toBe('DUP')
+    })
+
+    it('createCategory valida nombre y color con code VALIDATION', () => {
+      expect(codeOf(() => db.createCategory({ name: '  ', color: '#EF4444' }))).toBe('VALIDATION')
+      expect(codeOf(() => db.createCategory({ name: 'Ropa', color: 'rojo' }))).toBe('VALIDATION')
+    })
+
+    it('updateCategoryDef renombra y cascadea a expenses y comercios_conocidos', () => {
+      db.insert(sampleRecord({ gmail_message_id: 'a' })) // category: Comida
+      db.registrarComercio({ match: 'VERDULERIA', categoria: 'Comida' })
+      const comida = db.listCategories().find((c) => c.name === 'Comida')
+      db.updateCategoryDef(comida.id, { name: 'Morfi' })
+      expect(db.list('2026-06')[0].category).toBe('Morfi')
+      expect(db.findLearned('VERDULERIA KATIE')).toBe('Morfi')
+      expect(db.listCategories().some((c) => c.name === 'Morfi')).toBe(true)
+    })
+
+    it('updateCategoryDef no renombra Otros pero sí le cambia el color', () => {
+      const otros = db.listCategories().find((c) => c.name === 'Otros')
+      expect(codeOf(() => db.updateCategoryDef(otros.id, { name: 'Misc' }))).toBe('PROTECTED')
+      const r = db.updateCategoryDef(otros.id, { color: '#111111' })
+      expect(r.color).toBe('#111111')
+    })
+
+    it('deleteCategory mueve los gastos a Otros y borra las reglas', () => {
+      db.insert(sampleRecord({ gmail_message_id: 'a' })) // Comida
+      db.registrarComercio({ match: 'VERDULERIA', categoria: 'Comida' })
+      const comida = db.listCategories().find((c) => c.name === 'Comida')
+      const r = db.deleteCategory(comida.id)
+      expect(r.movidos).toBe(1)
+      expect(db.list('2026-06')[0].category).toBe('Otros')
+      expect(db.findLearned('VERDULERIA KATIE')).toBe(null)
+      expect(db.listCategories().some((c) => c.name === 'Comida')).toBe(false)
+    })
+
+    it('deleteCategory rechaza Otros e inexistentes', () => {
+      const otros = db.listCategories().find((c) => c.name === 'Otros')
+      expect(codeOf(() => db.deleteCategory(otros.id))).toBe('PROTECTED')
+      expect(codeOf(() => db.deleteCategory(9999))).toBe('NOT_FOUND')
+    })
+  })
 })
