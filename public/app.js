@@ -1,17 +1,17 @@
 /* gastaker — frontend (vanilla). Ledger view, month stepper, inline recat. */
 
-const CATS = [
-  { name: 'Comida', color: '#FF6B35' },
-  { name: 'Supermercado', color: '#06B6D4' },
-  { name: 'Transporte', color: '#4F46E5' },
-  { name: 'Servicios', color: '#A855F7' },
-  { name: 'Suscripciones', color: '#EC4899' },
-  { name: 'Salud', color: '#10B981' },
-  { name: 'Transferencias', color: '#F59E0B' },
-  { name: 'Otros', color: '#64748B' },
-]
-const COLOR = Object.fromEntries(CATS.map((c) => [c.name, c.color]))
+// Las categorías (nombre + color) viven en la DB y se cargan por API.
+let CATS = []
+let COLOR = {}
 const colorOf = (name) => COLOR[name] || '#71717a'
+
+async function loadCategories() {
+  const res = await fetch('/api/categories')
+  if (!res.ok) return
+  const data = await res.json()
+  CATS = data.categories
+  COLOR = Object.fromEntries(CATS.map((c) => [c.name, c.color]))
+}
 
 const MONTHS = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -57,6 +57,7 @@ function shiftMonth(ym, delta) {
 async function load() {
   const res = await fetch(`/api/expenses?month=${currentMonth}`)
   if (res.status === 401) return showLogin()
+  await loadCategories()
   const data = await res.json()
   lastData = data
   showApp()
@@ -170,31 +171,58 @@ function openCatMenu(anchor, id, current) {
       <span class="check">✓</span>
     </button>`
   ).join('')
+  positionMenu(anchor)
 
+  menu.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation()
+      const name = b.dataset.name
+      if (name === current) return closeMenu()
+      openScopeStep(anchor, id, name)
+    })
+  })
+}
+
+// Paso 2: elegir alcance. "Solo este gasto" = PATCH normal; "Siempre este
+// comercio" = learn:true (aprende la regla y pisa el histórico del comercio).
+function openScopeStep(anchor, id, category) {
+  const exp = lastData.expenses.find((e) => e.id === id)
+  const merchant = exp ? exp.merchant : ''
+  menu.innerHTML = `
+    <div class="scope-head">${escape(merchant)} → <span class="scope-cat" style="color:${colorOf(category)}">${category}</span></div>
+    <button data-scope="one">Solo este gasto</button>
+    <button data-scope="always">Siempre este comercio</button>
+  `
+  positionMenu(anchor)
+
+  menu.querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', async (ev) => {
+      ev.stopPropagation()
+      const learn = b.dataset.scope === 'always'
+      closeMenu()
+      const res = await fetch(`/api/expenses/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(learn ? { category, learn: true } : { category }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'No se pudo guardar')
+      }
+      load()
+    })
+  })
+}
+
+// Posiciona el popover pegado al anchor; si no entra abajo, abre hacia arriba.
+function positionMenu(anchor) {
   const r = anchor.getBoundingClientRect()
   menu.classList.remove('hidden')
-  // posicionar; si no entra abajo, abrir hacia arriba
   const mh = menu.offsetHeight
   const below = r.bottom + 6
   const top = below + mh > window.innerHeight ? r.top - mh - 6 : below
   menu.style.top = `${Math.max(8, top)}px`
   menu.style.left = `${Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)}px`
-
-  menu.querySelectorAll('button').forEach((b) => {
-    b.addEventListener('click', async (ev) => {
-      ev.stopPropagation()
-      const name = b.dataset.name
-      closeMenu()
-      if (name !== current) {
-        await fetch(`/api/expenses/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category: name }),
-        })
-        load()
-      }
-    })
-  })
 }
 function closeMenu() {
   menu.classList.add('hidden')

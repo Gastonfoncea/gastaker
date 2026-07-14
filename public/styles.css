@@ -514,6 +514,21 @@ body {
   opacity: 1;
 }
 
+/* paso 2 del popover: alcance de la recategorización */
+.catmenu .scope-head {
+  padding: 8px 12px 6px;
+  font-size: 12px;
+  color: #71717a;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.catmenu .scope-cat {
+  font-weight: 600;
+}
+
 /* ===========================================================
    EMPTY STATE
    =========================================================== */
