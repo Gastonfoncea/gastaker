@@ -1,6 +1,6 @@
-// test/db.test.js
+// test/db.test.js — la API de datos scopeada por usuario (db.forUser).
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createDb } from '../src/db.js'
+import { makeUserDb } from './helpers.js'
 
 function sampleRecord(overrides = {}) {
   return {
@@ -17,7 +17,8 @@ function sampleRecord(overrides = {}) {
 describe('db', () => {
   let db
   beforeEach(() => {
-    db = createDb(':memory:')
+    // db aquí es la API scopeada al usuario (forUser), misma superficie que antes.
+    db = makeUserDb().udb
   })
 
   it('inserta un gasto y lo lista', () => {

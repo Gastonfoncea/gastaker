@@ -799,3 +799,63 @@ body {
   flex-wrap: wrap;
   padding-top: 2px;
 }
+
+/* ===========================================================
+   AJUSTES / REGISTRO
+   =========================================================== */
+
+.setting {
+  margin: 28px 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.setting:first-child {
+  border-top: none;
+  padding-top: 8px;
+}
+.setting .muted {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin: 6px 0 12px;
+  line-height: 1.5;
+}
+.io-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.io-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+.io-row input:focus {
+  outline: none;
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(11, 11, 12, 0.06);
+}
+.btn {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.ok-msg {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #10b981;
+}

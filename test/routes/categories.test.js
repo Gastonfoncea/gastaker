@@ -3,22 +3,13 @@ import { describe, it, expect } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../../src/app.js'
 import { createDb } from '../../src/db.js'
+import { TEST_CONFIG, authedAgent } from '../helpers.js'
 
-const CONFIG = {
-  webhookSecret: 'secreto-test',
-  appPassword: 'clave-test',
-  sessionToken: 'token-test',
-}
-
+// makeApp devuelve { db, app } y udb scopeada; el user tiene email/password fijos.
 function makeApp() {
   const db = createDb(':memory:')
-  return { db, app: createApp({ db, config: CONFIG }) }
-}
-
-async function authedAgent(app) {
-  const agent = request.agent(app)
-  await agent.post('/api/login').send({ password: 'clave-test' })
-  return agent
+  const user = db.createUser({ email: 'test@test.com', password: 'clave-test' })
+  return { db, app: createApp({ db, config: TEST_CONFIG }), udb: db.forUser(user.id) }
 }
 
 describe('/api/categories', () => {
@@ -53,19 +44,19 @@ describe('/api/categories', () => {
   })
 
   it('PATCH renombra (cascadea) y DELETE mueve a Otros', async () => {
-    const { db, app } = makeApp()
-    db.insert({ gmail_message_id: 'a', amount: 100, merchant: 'VERDULERIA KATIE', category: 'Comida', occurred_at: '2026-06-01T10:00:00' })
+    const { app, udb } = makeApp()
+    udb.insert({ gmail_message_id: 'a', amount: 100, merchant: 'VERDULERIA KATIE', category: 'Comida', occurred_at: '2026-06-01T10:00:00' })
     const agent = await authedAgent(app)
     const comida = (await agent.get('/api/categories')).body.categories.find((c) => c.name === 'Comida')
 
     const ren = await agent.patch(`/api/categories/${comida.id}`).send({ name: 'Morfi' })
     expect(ren.status).toBe(200)
-    expect(db.list('2026-06')[0].category).toBe('Morfi')
+    expect(udb.list('2026-06')[0].category).toBe('Morfi')
 
     const del = await agent.delete(`/api/categories/${comida.id}`)
     expect(del.status).toBe(200)
     expect(del.body.movidos).toBe(1)
-    expect(db.list('2026-06')[0].category).toBe('Otros')
+    expect(udb.list('2026-06')[0].category).toBe('Otros')
   })
 
   it('Otros está protegida: PATCH de nombre y DELETE dan 400', async () => {

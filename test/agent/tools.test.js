@@ -1,18 +1,18 @@
 // test/agent/tools.test.js
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildTools } from '../../src/agent/tools.js'
-import { createDb } from '../../src/db.js'
+import { makeUserDb } from '../helpers.js'
 
-function seed(db) {
-  db.insert({ gmail_message_id: 'a', amount: 1500, merchant: 'VERDU', category: 'Comida', occurred_at: '2026-06-01T10:00:00', currency: 'ARS' })
+function seed(udb) {
+  udb.insert({ gmail_message_id: 'a', amount: 1500, merchant: 'VERDU', category: 'Comida', occurred_at: '2026-06-01T10:00:00', currency: 'ARS' })
 }
 
 describe('buildTools (read)', () => {
-  let db, tools
+  let tools
   beforeEach(() => {
-    db = createDb(':memory:')
-    seed(db)
-    tools = buildTools(db)
+    const { udb } = makeUserDb()
+    seed(udb)
+    tools = buildTools(udb)
   })
 
   it('expone las herramientas de consulta', () => {

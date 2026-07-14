@@ -4,10 +4,12 @@ import cookieParser from 'cookie-parser'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { ingestRouter } from './routes/ingest.js'
-import { loginHandler } from './auth.js'
+import { loginHandler, logoutHandler } from './auth.js'
 import { expensesRouter } from './routes/expenses.js'
 import { categoriesRouter } from './routes/categories.js'
 import { whatsappRouter } from './routes/whatsapp.js'
+import { meRouter } from './routes/me.js'
+import { invitesRouter, registerHandler } from './routes/invites.js'
 import { createMemory } from './agent/memory.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -23,11 +25,15 @@ export function createApp({ db, config }) {
   app.use(cookieParser())
 
   const memory = createMemory()
-  app.use('/api/ingest', ingestRouter({ db, config }))
+  app.use('/api/ingest', ingestRouter({ db }))
   app.use('/api/whatsapp', whatsappRouter({ config, db, memory }))
-  app.post('/api/login', loginHandler({ config }))
-  app.use('/api/expenses', expensesRouter({ db, config }))
-  app.use('/api/categories', categoriesRouter({ db, config }))
+  app.post('/api/login', loginHandler({ db }))
+  app.post('/api/logout', logoutHandler({ db }))
+  app.post('/api/register', registerHandler({ db }))
+  app.use('/api/me', meRouter({ db }))
+  app.use('/api/invites', invitesRouter({ db }))
+  app.use('/api/expenses', expensesRouter({ db }))
+  app.use('/api/categories', categoriesRouter({ db }))
 
   // Sirve el frontend estático (HTML/CSS/JS no contienen datos sensibles).
   app.use(express.static(join(__dirname, '..', 'public')))

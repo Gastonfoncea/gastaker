@@ -3,12 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../src/app.js'
 import { createDb } from '../src/db.js'
-
-const CONFIG = {
-  webhookSecret: 'secreto-test',
-  appPassword: 'clave-test',
-  sessionToken: 'token-test',
-}
+import { TEST_CONFIG } from './helpers.js'
 
 const SAMPLE = `Te acercamos el detalle de tu consumo con la Tarjeta Santander Visa Débito terminada en 1458.
 
@@ -24,28 +19,32 @@ Fecha
 Hora
 19:12`
 
-function makeApp() {
-  return createApp({ db: createDb(':memory:'), config: CONFIG })
+// db + user + app; token = ingest_token del user; udb = API scopeada.
+function makeCtx() {
+  const db = createDb(':memory:')
+  const user = db.createUser({ email: 'u@test.com', password: 'x' })
+  const app = createApp({ db, config: TEST_CONFIG })
+  return { db, app, token: user.ingest_token, udb: db.forUser(user.id) }
 }
 
 describe('POST /api/ingest', () => {
-  let app
+  let ctx
   beforeEach(() => {
-    app = makeApp()
+    ctx = makeCtx()
   })
 
-  it('rechaza si falta o no coincide el secreto', async () => {
-    const res = await request(app)
+  it('rechaza si el token no resuelve a ningún usuario', async () => {
+    const res = await request(ctx.app)
       .post('/api/ingest')
-      .set('X-Webhook-Secret', 'mal')
+      .set('X-Webhook-Secret', 'token-que-no-existe')
       .send({ messageId: 'm1', body: SAMPLE })
     expect(res.status).toBe(401)
   })
 
   it('parsea, categoriza y guarda un gasto válido', async () => {
-    const res = await request(app)
+    const res = await request(ctx.app)
       .post('/api/ingest')
-      .set('X-Webhook-Secret', 'secreto-test')
+      .set('X-Webhook-Secret', ctx.token)
       .send({ messageId: 'm1', body: SAMPLE })
     expect(res.status).toBe(200)
     expect(res.body.inserted).toBe(true)
@@ -54,9 +53,9 @@ describe('POST /api/ingest', () => {
 
   it('es idempotente con el mismo messageId', async () => {
     const send = () =>
-      request(app)
+      request(ctx.app)
         .post('/api/ingest')
-        .set('X-Webhook-Secret', 'secreto-test')
+        .set('X-Webhook-Secret', ctx.token)
         .send({ messageId: 'm1', body: SAMPLE })
     await send()
     const res = await send()
@@ -65,9 +64,9 @@ describe('POST /api/ingest', () => {
   })
 
   it('responde skipped:true si el body no es un gasto', async () => {
-    const res = await request(app)
+    const res = await request(ctx.app)
       .post('/api/ingest')
-      .set('X-Webhook-Secret', 'secreto-test')
+      .set('X-Webhook-Secret', ctx.token)
       .send({ messageId: 'm2', body: 'no soy un gasto' })
     expect(res.status).toBe(200)
     expect(res.body.skipped).toBe(true)
@@ -78,9 +77,9 @@ describe('POST /api/ingest', () => {
 ComercioMicrosoft*Xbox Game Pass
 Fecha04/06/2026
 Hora00:43`
-    const res = await request(app)
+    const res = await request(ctx.app)
       .post('/api/ingest')
-      .set('X-Webhook-Secret', 'secreto-test')
+      .set('X-Webhook-Secret', ctx.token)
       .send({ messageId: 'usd1', body: usd })
     expect(res.status).toBe(200)
     expect(res.body.inserted).toBe(true)
@@ -93,9 +92,9 @@ Hora00:43`
     CBU de Destino    0000003100090368368647
     Importe    $ 1.000,00
     Número de comprobante    61949218`
-    const res = await request(app)
+    const res = await request(ctx.app)
       .post('/api/ingest')
-      .set('X-Webhook-Secret', 'secreto-test')
+      .set('X-Webhook-Secret', ctx.token)
       .send({ messageId: 'tr1', body: transfer, receivedAt: '2026-06-02T15:10:00.000Z' })
     expect(res.status).toBe(200)
     expect(res.body.inserted).toBe(true)
@@ -104,8 +103,7 @@ Hora00:43`
   })
 
   it('un comercio desconocido entra con needs_review; tras registrarlo, el siguiente no', async () => {
-    const db = createDb(':memory:')
-    const app = createApp({ db, config: CONFIG })
+    const { app, token, udb } = makeCtx()
     const body = `Aviso de consumo TD
 Tarjeta Santander Visa Débito terminada en *1458*.
 Monto
@@ -116,13 +114,13 @@ Fecha
 *08/06/2026*
 Hora
 *10:00*`
-    await request(app).post('/api/ingest').set('X-Webhook-Secret', 'secreto-test').send({ messageId: 'k1', body })
-    expect(db.pendientes()).toHaveLength(1) // cayó en Otros -> pendiente
+    await request(app).post('/api/ingest').set('X-Webhook-Secret', token).send({ messageId: 'k1', body })
+    expect(udb.pendientes()).toHaveLength(1) // cayó en Otros -> pendiente
 
-    db.registrarComercio({ match: 'KIOSCO RARO', categoria: 'Comida' })
-    await request(app).post('/api/ingest').set('X-Webhook-Secret', 'secreto-test').send({ messageId: 'k2', body: body.replace('10:00', '11:00') })
+    udb.registrarComercio({ match: 'KIOSCO RARO', categoria: 'Comida' })
+    await request(app).post('/api/ingest').set('X-Webhook-Secret', token).send({ messageId: 'k2', body: body.replace('10:00', '11:00') })
     // el segundo NO queda pendiente (lo agarró findLearned)
-    const last = db.list('2026-06').find((e) => e.gmail_message_id === 'k2')
+    const last = udb.list('2026-06').find((e) => e.gmail_message_id === 'k2')
     expect(last.category).toBe('Comida')
     expect(last.needs_review).toBe(0)
   })
