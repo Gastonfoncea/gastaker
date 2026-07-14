@@ -465,6 +465,7 @@ export function createDb(path) {
 
     // { valid:true } o { valid:false, reason: 'not_found'|'used'|'expired' }.
     getInvite(token) {
+      if (!token) return { valid: false, reason: 'not_found' }
       const row = sqlite
         .prepare("SELECT used_by, (expires_at < datetime('now')) AS expired FROM invites WHERE token = ?")
         .get(token)
@@ -476,6 +477,7 @@ export function createDb(path) {
 
     // Marca el invite como usado. Lanza INVITE_INVALID si no existe / ya usado / vencido.
     useInvite(token, userId) {
+      if (!token) fail('INVITE_INVALID', 'invitación inexistente')
       sqlite.transaction(() => {
         const row = sqlite
           .prepare("SELECT used_by, (expires_at < datetime('now')) AS expired FROM invites WHERE token = ?")

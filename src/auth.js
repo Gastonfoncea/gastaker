@@ -1,15 +1,15 @@
 // src/auth.js
 
-// Config de la cookie de sesión. httpOnly + sameSite lax. secure según req.secure:
+// Setea la cookie de sesión. httpOnly + sameSite lax. secure según req.secure:
 // en producción (detrás de Caddy) req.secure es true → la cookie nunca viaja en
-// claro; en tests/local (http) es false.
-function cookieOpts(req) {
-  return {
+// claro; en tests/local (http) es false. Reutilizado por login y register.
+export function setAuthCookie(req, res, token) {
+  res.cookie('gastaker_auth', token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: req.secure,
     maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días
-  }
+  })
 }
 
 // Handler de login por email+password. Crea una sesión real y setea la cookie.
@@ -19,7 +19,7 @@ export function loginHandler({ db }) {
     const user = db.authenticate(email, password)
     if (!user) return res.status(401).json({ error: 'email o clave incorrectos' })
     const { token } = db.createSession(user.id)
-    res.cookie('gastaker_auth', token, cookieOpts(req))
+    setAuthCookie(req, res, token)
     return res.json({ ok: true })
   }
 }
