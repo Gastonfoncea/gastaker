@@ -12,6 +12,7 @@
 
 - Valores de `payment_method`: `'Crédito'`, `'Débito'`, `NULL` (histórico/desconocido; a efectos de totales, NULL = débito, sigue sumando).
 - Copy exacto de UI: la línea del header dice `Tarjeta: $…`; el badge del ledger dice `crédito`.
+- Categoría nueva de sistema: nombre exacto `Tarjeta`, color `#DC2626`, `excluded = 0`. Es la categoría del pago del resumen (débito real): SUMA al total.
 - Los USD no cambian: la línea USD sigue sumando todo, sin importar medio de pago.
 - El agente de WhatsApp NO se toca (`resumenMes`, `compararMeses`, etc. quedan como están).
 - Todos los tests corren con `npx vitest run <archivo>` (suite completa: `npm test`).
@@ -19,14 +20,14 @@
 
 ---
 
-### Task 1: Columna `payment_method` en la DB
+### Task 1: Columna `payment_method` en la DB + categoría "Tarjeta"
 
 **Files:**
-- Modify: `src/db.js` (expensesSchema línea ~22, migraciones línea ~168, insertStmt línea ~182, insert() línea ~219)
+- Modify: `src/db.js` (DEFAULT_CATEGORIES línea ~8, expensesSchema línea ~22, migraciones línea ~168, insertStmt línea ~182, insert() línea ~219)
 - Create: `test/payment-method.test.js`
 
 **Interfaces:**
-- Produces: `udb.insert(record)` acepta `payment_method` (string o null, default null); las filas de `udb.list(month)` y `udb.getExpense(id)` traen `payment_method`.
+- Produces: `udb.insert(record)` acepta `payment_method` (string o null, default null); las filas de `udb.list(month)` y `udb.getExpense(id)` traen `payment_method`. Todo usuario (nuevo o migrado) tiene la categoría `Tarjeta` (`#DC2626`, excluded 0).
 
 - [ ] **Step 1: Escribir los tests que fallan**
 
@@ -62,6 +63,14 @@ describe('columna payment_method', () => {
     expect(rows.find((r) => r.gmail_message_id === 'm-cred').payment_method).toBe('Crédito')
     expect(rows.find((r) => r.gmail_message_id === 'm-deb').payment_method).toBe('Débito')
     expect(rows.find((r) => r.gmail_message_id === 'm-sin').payment_method).toBeNull()
+  })
+
+  it('el seed de un usuario nuevo incluye la categoría "Tarjeta" (excluded=0)', () => {
+    const { udb } = makeUserDb()
+    const tarjeta = udb.listCategories().find((c) => c.name === 'Tarjeta')
+    expect(tarjeta).toBeDefined()
+    expect(tarjeta.excluded).toBe(0)
+    expect(tarjeta.color).toBe('#DC2626')
   })
 })
 
@@ -129,10 +138,18 @@ describe('migración: DB multi-user previa sin payment_method', () => {
     expect(viejo.payment_method).toBeNull()
   })
 
-  it('es idempotente: correr createDb dos veces no rompe', () => {
+  it('backfillea la categoría "Tarjeta" a los usuarios existentes', () => {
+    const db = createDb(dbPath)
+    const tarjeta = db.forUser(1).listCategories().find((c) => c.name === 'Tarjeta')
+    expect(tarjeta).toBeDefined()
+    expect(tarjeta.excluded).toBe(0)
+  })
+
+  it('es idempotente: correr createDb dos veces no rompe ni duplica "Tarjeta"', () => {
     createDb(dbPath)._raw.close()
     const db = createDb(dbPath)
     expect(db.forUser(1).list('2026-07')).toHaveLength(1)
+    expect(db.forUser(1).listCategories().filter((c) => c.name === 'Tarjeta')).toHaveLength(1)
   })
 })
 ```
@@ -171,14 +188,41 @@ lista explícita en su `INSERT INTO expenses_new (...) SELECT ...`, así que agr
 la columna al schema no la rompe: en ese caso `payment_method` queda NULL. NO tocar
 ese bloque.
 
-3b. Después del bloque de migración de `expenses` a multi-user (después de la línea `sqlite.pragma('foreign_keys = ON')` de ese bloque, ~línea 101), agregar:
+3b. Después del bloque "Migración: flag excluded en categories" (después de su `}` de cierre, ~línea 180), agregar. OJO: va ahí (y NO junto a la migración multi-user de expenses) porque el backfill necesita que la tabla `users` ya exista:
 
 ```js
   // --- Migración: payment_method en expenses (idempotente) ---
   // 'Crédito' | 'Débito' | NULL. NULL (histórico) cuenta como débito en los totales.
+  // El backfill corre una sola vez: seedea la categoría "Tarjeta" (el pago del
+  // resumen se categoriza ahí) a los usuarios existentes; los nuevos la reciben
+  // vía DEFAULT_CATEGORIES. Si el usuario la borra después, no se re-seedea.
   if (!sqlite.prepare('PRAGMA table_info(expenses)').all().some((c) => c.name === 'payment_method')) {
     sqlite.exec('ALTER TABLE expenses ADD COLUMN payment_method TEXT')
+    sqlite.exec(`
+      INSERT INTO categories (user_id, name, color, excluded)
+      SELECT u.id, 'Tarjeta', '#DC2626', 0 FROM users u
+      WHERE NOT EXISTS (
+        SELECT 1 FROM categories c WHERE c.user_id = u.id AND c.name = 'Tarjeta' COLLATE NOCASE
+      )
+    `)
   }
+```
+
+3b-bis. En `DEFAULT_CATEGORIES` (línea ~8), agregar la categoría del pago del resumen después de `Transferencias`:
+
+```js
+const DEFAULT_CATEGORIES = [
+  ['Comida', '#FF6B35', 0],
+  ['Supermercado', '#06B6D4', 0],
+  ['Transporte', '#4F46E5', 0],
+  ['Servicios', '#A855F7', 0],
+  ['Suscripciones', '#EC4899', 0],
+  ['Salud', '#10B981', 0],
+  ['Transferencias', '#F59E0B', 0],
+  ['Tarjeta', '#DC2626', 0],
+  ['Otros', '#64748B', 0],
+  ['Movimientos internos', '#94A3B8', 1],
+]
 ```
 
 3c. Actualizar `insertStmt`:
@@ -212,7 +256,7 @@ ese bloque.
 - [ ] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `npx vitest run test/payment-method.test.js`
-Expected: PASS (3 tests)
+Expected: PASS (5 tests)
 
 Después correr la suite entera para verificar que nada se rompió:
 
@@ -331,7 +375,7 @@ En el `udb.insert({...})`, agregar `payment_method` después de `card`:
 - [ ] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `npx vitest run test/payment-method.test.js`
-Expected: PASS (5 tests)
+Expected: PASS (7 tests)
 
 Run: `npm test`
 Expected: PASS
@@ -403,7 +447,7 @@ En el loop de `totals` del GET, saltar también los crédito:
 - [ ] **Step 4: Correr los tests y verificar que pasan**
 
 Run: `npx vitest run test/payment-method.test.js`
-Expected: PASS (6 tests)
+Expected: PASS (8 tests)
 
 Run: `npm test`
 Expected: PASS
@@ -577,3 +621,170 @@ Expected: PASS
 git add public/index.html public/app.js public/styles.css
 git commit -m "feat(ui): acumulado Tarjeta aparte del total; crédito fuera de barra/leyenda con badge"
 ```
+
+---
+
+### Task 5: Parser del mail "pago de tu tarjeta" + categoría fija en la ingesta
+
+Santander manda un mail cuando debita el resumen de la cuenta ("Debitamos $X ... por el pago de tu Tarjeta"). Hoy el parser lo descarta (no tiene etiqueta "Monto" → `parseBody` devuelve null) y esa plata no entra nunca: con los consumos de crédito excluidos del total, el total quedaría subestimado para siempre. Este task lo captura como gasto real (débito de cuenta, suma al total) con categoría fija `Tarjeta`.
+
+Depende de Tasks 1 y 2 (columna `payment_method` + ingesta persistiéndola). Independiente de Tasks 3 y 4.
+
+**Files:**
+- Modify: `src/sources/santander.js` (parseBody línea ~26 y función nueva al final)
+- Modify: `src/routes/ingest.js` (rama de categorización, línea ~29)
+- Modify: `test/sources/santander.test.js` (test del parser)
+- Modify: `test/payment-method.test.js` (test de ingesta end-to-end)
+
+**Interfaces:**
+- Consumes: `udb.insert()` con `payment_method` (Task 1); ingesta persistiendo `parsed.type` (Task 2); categoría `Tarjeta` seedeada (Task 1).
+- Produces: `santander.parse()` devuelve `{ amount, currency: 'ARS', merchant: 'Pago tarjeta <MARCA>', occurredAt: null, card, type: 'Débito', kind: 'pago_tarjeta' }` para este mail; la ingesta lo guarda con categoría `'Tarjeta'` y `needs_review = 0`.
+
+- [ ] **Step 1: Escribir el test del parser que falla**
+
+Agregar a `test/sources/santander.test.js` (el fixture arriba junto a los otros SAMPLE, el `it` dentro del `describe('santander.parse')`):
+
+```js
+const MAIL_PAGO_RESUMEN = `Información sobre el pago de tu tarjeta
+Hola
+Santander
+Debitamos $987.357,33 de tu Cuenta en Pesos N° XXXX-2910 por el pago de tu Tarjeta SANTANDER VISA.
+
+    Tarjeta    XXXX-XXX3967
+    Saldo en pesos    $ 726.357,33
+    Saldo en dólares    u$s 174,00
+    Pago mínimo    $ 142.880,00`
+```
+
+```js
+  it('parsea el pago del resumen de la tarjeta como débito real', () => {
+    const r = parse(MAIL_PAGO_RESUMEN)
+    expect(r).not.toBeNull()
+    expect(r.amount).toBe(987357.33)
+    expect(r.currency).toBe('ARS')
+    expect(r.merchant).toBe('Pago tarjeta SANTANDER VISA')
+    expect(r.card).toBe('3967')
+    expect(r.type).toBe('Débito')
+    expect(r.kind).toBe('pago_tarjeta')
+    expect(r.occurredAt).toBeNull()
+  })
+```
+
+- [ ] **Step 2: Correr el test y verificar que falla**
+
+Run: `npx vitest run test/sources/santander.test.js`
+Expected: FAIL — `r` es `null` (el mail no tiene "Monto" y el parser actual no lo reconoce).
+
+- [ ] **Step 3: Implementar el parser en `src/sources/santander.js`**
+
+3a. En `parseBody`, después del check de `isIgnored` (línea ~28), intentar primero el caso pago de tarjeta:
+
+```js
+function parseBody(text) {
+  if (!text) return null
+  if (isIgnored(text)) return null
+
+  const pago = parsePagoTarjeta(text)
+  if (pago) return pago
+```
+
+3b. Agregar la función al final del archivo (después de `parseType`):
+
+```js
+// Mail "pago de tu tarjeta": Santander debitó el resumen de la cuenta.
+// Es plata que sale de la cuenta HOY (los consumos con crédito individuales
+// no suman al total; este débito sí). El monto de "Debitamos" incluye el
+// saldo en dólares convertido a pesos. El mail no trae Fecha/Hora: occurredAt
+// queda null y la ingesta usa receivedAt.
+function parsePagoTarjeta(text) {
+  if (!/Debitamos/i.test(text) || !/pago de tu Tarjeta/i.test(text)) return null
+  const m = text.match(/Debitamos[\s*]*\$\s*([\d.,]+)/i)
+  if (!m) return null
+  const amount = parseAmount(m[1])
+  if (amount === null) return null
+  const brand = text.match(/pago de tu Tarjeta\s+([^\n\r.]+)/i)
+  const card = text.match(/Tarjeta[^\d\n\r]*(\d{4})/i)
+  return {
+    amount,
+    currency: 'ARS',
+    merchant: `Pago tarjeta${brand ? ' ' + brand[1].replace(/[\s*]+$/, '').trim() : ''}`,
+    occurredAt: null,
+    card: card ? card[1] : null,
+    type: 'Débito',
+    kind: 'pago_tarjeta',
+  }
+}
+```
+
+- [ ] **Step 4: Correr el test del parser y verificar que pasa**
+
+Run: `npx vitest run test/sources/santander.test.js`
+Expected: PASS (todos, incluidos los preexistentes: consumo, USD, transferencia, anulación, ignorados)
+
+- [ ] **Step 5: Escribir el test de ingesta que falla**
+
+Agregar al `describe('ingesta: persiste el medio de pago')` de `test/payment-method.test.js` (reusar el fixture `MAIL_PAGO_RESUMEN`, copiarlo arriba del archivo junto a `MAIL_CREDITO`):
+
+```js
+  it('el pago del resumen entra con categoría "Tarjeta", suma como Débito y usa receivedAt', async () => {
+    const res = await request(app)
+      .post('/api/ingest')
+      .set('X-Webhook-Secret', token)
+      .send({ messageId: 'm-pago', body: MAIL_PAGO_RESUMEN, receivedAt: '2026-07-15T09:00:00.000Z' })
+    expect(res.status).toBe(200)
+    expect(res.body.inserted).toBe(true)
+    expect(res.body.category).toBe('Tarjeta')
+    const row = udb.list('2026-07').find((r) => r.gmail_message_id === 'm-pago')
+    expect(row.amount).toBe(987357.33)
+    expect(row.payment_method).toBe('Débito')
+    expect(row.category).toBe('Tarjeta')
+    expect(row.needs_review).toBe(0)
+    expect(row.occurred_at).toBe('2026-07-15T09:00:00')
+  })
+```
+
+- [ ] **Step 6: Correr el test y verificar que falla**
+
+Run: `npx vitest run test/payment-method.test.js`
+Expected: FAIL — `category` da `'Otros'` (con `needs_review = 1`) en vez de `'Tarjeta'`: el parser ya lo reconoce (Step 3) pero la ingesta no tiene la rama de categorización.
+
+- [ ] **Step 7: Implementar la rama en `src/routes/ingest.js`**
+
+En el bloque de categorización (línea ~29), agregar el caso `pago_tarjeta` primero:
+
+```js
+    // Categoría: pago de resumen y transferencia son fijas; si no, regla
+    // estática -> comercio aprendido -> default.
+    let category
+    let needsReview = 0
+    if (parsed.kind === 'pago_tarjeta') {
+      category = 'Tarjeta'
+    } else if (parsed.kind === 'transferencia') {
+      const learned = udb.findLearned(parsed.merchant)
+      category = learned || 'Transferencias'
+      needsReview = learned ? 0 : 1
+    } else {
+```
+
+(el resto del bloque queda igual)
+
+- [ ] **Step 8: Correr los tests y verificar que pasan**
+
+Run: `npx vitest run test/payment-method.test.js`
+Expected: PASS (9 tests)
+
+Run: `npm test`
+Expected: PASS
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/sources/santander.js src/routes/ingest.js test/sources/santander.test.js test/payment-method.test.js
+git commit -m "feat(santander): parsear el mail de pago del resumen como débito real (categoría Tarjeta)"
+```
+
+---
+
+## Nota post-deploy (manual, no es un task)
+
+Los mails de pago de resumen anteriores al deploy ya tienen la etiqueta `gastaker-procesado` en Gmail (la ingesta respondió 200 con `skipped`), así que no se reprocesan solos. Para ingestar el del último resumen: en Gmail, sacarle la etiqueta `gastaker-procesado` al thread "Información sobre el pago de tu tarjeta" y esperar el próximo sync del Apps Script (corre cada 5 min).
