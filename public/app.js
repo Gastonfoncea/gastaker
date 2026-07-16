@@ -83,7 +83,11 @@ function render({ expenses }) {
   const usd = expenses.filter((e) => e.currency === 'USD')
   const arsTotal = ars.filter((e) => !noSuma(e) && !esCredito(e)).reduce((s, e) => s + e.amount, 0)
   const usdTotal = usd.filter((e) => !noSuma(e)).reduce((s, e) => s + e.amount, 0)
-  const tarjetaTotal = ars.filter((e) => !noSuma(e) && esCredito(e)).reduce((s, e) => s + e.amount, 0)
+  // La línea Tarjeta muestra las dos monedas: el resumen del mes que viene va a
+  // debitar los consumos en pesos MÁS los dólares convertidos, así que dejar los
+  // USD afuera mostraría solo una parte de lo que se viene.
+  const tarjetaArs = ars.filter((e) => !noSuma(e) && esCredito(e)).reduce((s, e) => s + e.amount, 0)
+  const tarjetaUsd = usd.filter((e) => !noSuma(e) && esCredito(e)).reduce((s, e) => s + e.amount, 0)
 
   $('#total').innerHTML = arsTotal ? money(arsTotal, 'ARS') : '<span class="muted">$0</span>'
 
@@ -96,8 +100,11 @@ function render({ expenses }) {
   }
 
   const tarjetaEl = $('#total-tarjeta')
-  if (tarjetaTotal > 0) {
-    tarjetaEl.innerHTML = `Tarjeta: ${money(tarjetaTotal, 'ARS')}`
+  const tarjetaPartes = []
+  if (tarjetaArs > 0) tarjetaPartes.push(money(tarjetaArs, 'ARS'))
+  if (tarjetaUsd > 0) tarjetaPartes.push(money(tarjetaUsd, 'USD'))
+  if (tarjetaPartes.length) {
+    tarjetaEl.innerHTML = `Tarjeta: ${tarjetaPartes.join(' + ')}`
     tarjetaEl.classList.remove('hidden')
   } else {
     tarjetaEl.classList.add('hidden')
