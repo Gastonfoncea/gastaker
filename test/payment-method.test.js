@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createDb } from '../src/db.js'
 import { createApp } from '../src/app.js'
-import { makeUserDb, TEST_CONFIG } from './helpers.js'
+import { makeUserDb, makeAppWithUser, authedAgent, TEST_CONFIG } from './helpers.js'
 
 const MAIL_CREDITO = `Te acercamos el detalle de tu consumo con la Tarjeta Santander Visa Crédito terminada en 2044.
 
@@ -170,5 +170,20 @@ describe('ingesta: persiste el medio de pago', () => {
   it('un consumo con débito guarda payment_method = Débito', async () => {
     await ingest('m-deb', MAIL_DEBITO)
     expect(udb.list('2026-07').find((r) => r.gmail_message_id === 'm-deb').payment_method).toBe('Débito')
+  })
+})
+
+describe('GET /api/expenses', () => {
+  it('totals no incluye los gastos con crédito; expenses sí los trae', async () => {
+    const { db, user, app } = makeAppWithUser()
+    const udb = db.forUser(user.id)
+    udb.insert(gasto({ amount: 1000, category: 'Comida', payment_method: 'Débito' }))
+    udb.insert(gasto({ amount: 500, category: 'Comida', payment_method: 'Crédito' }))
+    udb.insert(gasto({ amount: 200, category: 'Transporte' })) // NULL = débito, suma
+    const agent = await authedAgent(app)
+    const res = await agent.get('/api/expenses?month=2026-07')
+    expect(res.body.totals).toEqual({ Comida: 1000, Transporte: 200 })
+    expect(res.body.expenses).toHaveLength(3)
+    expect(res.body.expenses.some((e) => e.payment_method === 'Crédito')).toBe(true)
   })
 })
