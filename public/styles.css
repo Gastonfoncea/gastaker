@@ -626,6 +626,13 @@ body {
   .total {
     font-size: 40px;
   }
+  /* La línea de tarjeta puede llevar dos montos ("Tarjeta: $X + U$S Y") y a
+     20px se parte en dos líneas en cualquier teléfono. Escala con el viewport
+     para entrar siempre en una sola. */
+  .total-tarjeta {
+    font-size: clamp(14px, 4.2vw, 20px);
+    white-space: nowrap;
+  }
   .thead {
     display: none;
   }
