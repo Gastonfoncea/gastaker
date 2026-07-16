@@ -2,11 +2,41 @@
 // Los consumos con crédito no suman al total del mes: se debitan el mes siguiente.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
+import request from 'supertest'
 import { existsSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createDb } from '../src/db.js'
-import { makeUserDb } from './helpers.js'
+import { createApp } from '../src/app.js'
+import { makeUserDb, TEST_CONFIG } from './helpers.js'
+
+const MAIL_CREDITO = `Te acercamos el detalle de tu consumo con la Tarjeta Santander Visa Crédito terminada en 2044.
+
+Monto
+$50.000,00
+
+Comercio
+COTO SUC 99
+
+Fecha
+10/07/2026
+
+Hora
+12:00`
+
+const MAIL_DEBITO = `Te acercamos el detalle de tu consumo con la Tarjeta Santander Visa Débito terminada en 1458.
+
+Monto
+$12.946,00
+
+Comercio
+VERDULERIA KATIE
+
+Fecha
+08/07/2026
+
+Hora
+19:12`
 
 const gasto = (over = {}) => ({
   gmail_message_id: `m-${Math.random()}`,
@@ -114,5 +144,31 @@ describe('migración: DB multi-user previa sin payment_method', () => {
     const db = createDb(dbPath)
     expect(db.forUser(1).list('2026-07')).toHaveLength(1)
     expect(db.forUser(1).listCategories().filter((c) => c.name === 'Tarjeta')).toHaveLength(1)
+  })
+})
+
+describe('ingesta: persiste el medio de pago', () => {
+  let db, app, token, udb
+  beforeEach(() => {
+    db = createDb(':memory:')
+    const user = db.createUser({ email: 'u@test.com', password: 'x' })
+    app = createApp({ db, config: TEST_CONFIG })
+    token = user.ingest_token
+    udb = db.forUser(user.id)
+  })
+
+  const ingest = (messageId, body) =>
+    request(app).post('/api/ingest').set('X-Webhook-Secret', token).send({ messageId, body })
+
+  it('un consumo con crédito guarda payment_method = Crédito', async () => {
+    const res = await ingest('m-cred', MAIL_CREDITO)
+    expect(res.status).toBe(200)
+    expect(res.body.inserted).toBe(true)
+    expect(udb.list('2026-07').find((r) => r.gmail_message_id === 'm-cred').payment_method).toBe('Crédito')
+  })
+
+  it('un consumo con débito guarda payment_method = Débito', async () => {
+    await ingest('m-deb', MAIL_DEBITO)
+    expect(udb.list('2026-07').find((r) => r.gmail_message_id === 'm-deb').payment_method).toBe('Débito')
   })
 })

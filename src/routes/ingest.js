@@ -54,6 +54,7 @@ export function ingestRouter({ db }) {
       merchant: parsed.merchant,
       category,
       card: parsed.card,
+      payment_method: parsed.type || null,
       occurred_at,
       currency: parsed.currency,
       source: parsed.source,
