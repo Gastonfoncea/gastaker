@@ -74,7 +74,12 @@ function render({ expenses }) {
   // en su propia línea ("Tarjeta"), como los USD.
   const noSuma = (e) => EXCLUDED.has(e.category)
   const esCredito = (e) => e.payment_method === 'Crédito'
-  const ars = expenses.filter((e) => (e.currency || 'ARS') === 'ARS')
+  const esArs = (e) => (e.currency || 'ARS') === 'ARS'
+  // Un gasto no suma a nada si su categoría está excluida, o si es un consumo
+  // con crédito EN PESOS (esos van a la línea Tarjeta). Un consumo con crédito
+  // en USD sí suma: la línea USD los cuenta igual, sin importar el medio de pago.
+  const noSumaFila = (e) => noSuma(e) || (esCredito(e) && esArs(e))
+  const ars = expenses.filter(esArs)
   const usd = expenses.filter((e) => e.currency === 'USD')
   const arsTotal = ars.filter((e) => !noSuma(e) && !esCredito(e)).reduce((s, e) => s + e.amount, 0)
   const usdTotal = usd.filter((e) => !noSuma(e)).reduce((s, e) => s + e.amount, 0)
@@ -147,7 +152,7 @@ function render({ expenses }) {
           const { day, time } = fmtDate(e.occurred_at)
           const card = e.card ? `<span class="row-card">•${e.card}</span>` : ''
           const credito = esCredito(e) ? '<span class="row-credito">crédito</span>' : ''
-          return `<div class="row${noSuma(e) || esCredito(e) ? ' excluded' : ''}" style="animation-delay:${Math.min(i * 22, 260)}ms">
+          return `<div class="row${noSumaFila(e) ? ' excluded' : ''}" style="animation-delay:${Math.min(i * 22, 260)}ms">
             <div class="cell-date"><span class="d-day">${day}</span><span class="d-time">${time}</span></div>
             <div class="cell-merchant">
               <span class="row-merchant">${escape(e.merchant)}</span>${card}${credito}
