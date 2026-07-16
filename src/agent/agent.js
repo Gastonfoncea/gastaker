@@ -61,6 +61,8 @@ export function systemPrompt(today) {
     `Hoy es ${today} (mes actual ${mes}). Si el usuario dice "este mes" usá ${mes}.`,
     'Respondés preguntas sobre los gastos usando las herramientas (no inventes números: siempre consultá).',
     'Los montos en pesos (ARS) y en dólares (USD) son distintos: nunca los sumes entre sí.',
+    'Los consumos con tarjeta de crédito (totalTarjeta*) NO están incluidos en el total del mes:',
+    'todavía no salieron de la cuenta, los debita el resumen el mes que viene. Si hay, mencionalos aparte.',
     'Para clasificar: si un gasto es de un comercio/CUIT recurrente usá registrar_comercio (aprende para el futuro);',
     'si es algo puntual que no se repite usá clasificar_gasto. Ante la duda, preguntá.',
     'IMPORTANTE: el "match" de registrar_comercio debe ser un identificador específico (el CUIT de la transferencia,',

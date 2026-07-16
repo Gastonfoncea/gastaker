@@ -5,7 +5,7 @@ export function buildTools(db) {
   const definitions = [
     {
       name: 'resumen_mes',
-      description: 'Total gastado en un mes (pesos y dólares por separado) y desglose por categoría. Usar para "¿cuánto gasté?", "¿en qué se me va la plata?".',
+      description: 'Total gastado en un mes (pesos y dólares por separado) y desglose por categoría. Usar para "¿cuánto gasté?", "¿en qué se me va la plata?". totalArs/totalUsd son la plata que YA salió de la cuenta; totalTarjetaArs/totalTarjetaUsd son los consumos con tarjeta de crédito, que todavía no se debitaron.',
       input_schema: {
         type: 'object',
         properties: { mes: { type: 'string', description: 'Mes en formato YYYY-MM, ej. 2026-06' } },

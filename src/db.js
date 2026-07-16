@@ -257,14 +257,24 @@ export function createDb(path) {
 
       // Resumen del mes: total ARS, total USD, y desglose ARS por categoría (neto > 0).
       // Las categorías excluidas (excluded=1) no suman ni aparecen en el desglose.
+      // Los consumos con crédito tampoco: no salieron de la cuenta este mes, los
+      // debita el resumen de la tarjeta el mes que viene (en pesos). Van aparte en
+      // totalTarjetaArs/Usd. Misma regla que la web: los dos tienen que dar igual.
       resumenMes(month) {
         const excluded = excludedNames()
         const rows = listStmt.all({ user_id: userId, prefix: `${month}%` })
         let totalArs = 0
         let totalUsd = 0
+        let totalTarjetaArs = 0
+        let totalTarjetaUsd = 0
         const cat = {}
         for (const r of rows) {
           if (excluded.has(r.category)) continue
+          if (r.payment_method === 'Crédito') {
+            if (r.currency === 'USD') totalTarjetaUsd += r.amount
+            else totalTarjetaArs += r.amount
+            continue
+          }
           if (r.currency === 'USD') totalUsd += r.amount
           else {
             totalArs += r.amount
@@ -273,7 +283,7 @@ export function createDb(path) {
         }
         const categoriasArs = {}
         for (const [k, v] of Object.entries(cat)) if (v > 0) categoriasArs[k] = v
-        return { month, totalArs, totalUsd, categoriasArs }
+        return { month, totalArs, totalUsd, totalTarjetaArs, totalTarjetaUsd, categoriasArs }
       },
 
       // Lista de movimientos del mes, opcionalmente filtrada (máx 50).
@@ -293,12 +303,14 @@ export function createDb(path) {
           }))
       },
 
+      // Misma regla que resumenMes y que la web: el crédito no suma (se debita
+      // el mes que viene).
       compararMeses(mesA, mesB) {
         const excluded = excludedNames()
         const tot = (m) => {
           const rows = listStmt
             .all({ user_id: userId, prefix: `${m}%` })
-            .filter((r) => !excluded.has(r.category))
+            .filter((r) => !excluded.has(r.category) && r.payment_method !== 'Crédito')
           return {
             totalArs: rows.filter((r) => r.currency !== 'USD').reduce((s, r) => s + r.amount, 0),
             totalUsd: rows.filter((r) => r.currency === 'USD').reduce((s, r) => s + r.amount, 0),

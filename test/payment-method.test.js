@@ -199,6 +199,48 @@ describe('ingesta: persiste el medio de pago', () => {
   })
 })
 
+// El agente de WhatsApp tiene que dar los mismos números que la web: si sumara
+// el crédito, "¿cuánto gasté?" respondería distinto en cada lado.
+describe('agente: resumenMes y compararMeses excluyen el crédito', () => {
+  const conGastos = () => {
+    const { udb } = makeUserDb()
+    udb.insert(gasto({ amount: 1000, category: 'Comida', payment_method: 'Débito' }))
+    udb.insert(gasto({ amount: 500, category: 'Comida', payment_method: 'Crédito' }))
+    udb.insert(gasto({ amount: 200, category: 'Transporte' })) // NULL = débito, suma
+    udb.insert(gasto({ amount: 30, currency: 'USD', category: 'Suscripciones', payment_method: 'Crédito' }))
+    udb.insert(gasto({ amount: 10, currency: 'USD', category: 'Otros', payment_method: 'Débito' }))
+    return udb
+  }
+
+  it('resumenMes no suma el crédito y lo reporta aparte, por moneda', () => {
+    const r = conGastos().resumenMes('2026-07')
+    expect(r.totalArs).toBe(1200) // 1000 + 200; los 500 de crédito NO
+    expect(r.totalUsd).toBe(10) // solo el débito
+    expect(r.categoriasArs).toEqual({ Comida: 1000, Transporte: 200 })
+    expect(r.totalTarjetaArs).toBe(500)
+    expect(r.totalTarjetaUsd).toBe(30)
+  })
+
+  it('compararMeses no suma el crédito', () => {
+    const udb = conGastos()
+    udb.insert(gasto({ amount: 700, category: 'Comida', occurred_at: '2026-06-05T10:00:00', payment_method: 'Débito' }))
+    udb.insert(gasto({ amount: 900, category: 'Comida', occurred_at: '2026-06-06T10:00:00', payment_method: 'Crédito' }))
+    const r = udb.compararMeses('2026-06', '2026-07')
+    expect(r['2026-06'].totalArs).toBe(700) // sin los 900 de crédito
+    expect(r['2026-07'].totalArs).toBe(1200)
+    expect(r['2026-07'].totalUsd).toBe(10)
+  })
+
+  it('un mes sin crédito reporta los acumulados de tarjeta en 0', () => {
+    const { udb } = makeUserDb()
+    udb.insert(gasto({ amount: 300, payment_method: 'Débito' }))
+    const r = udb.resumenMes('2026-07')
+    expect(r.totalArs).toBe(300)
+    expect(r.totalTarjetaArs).toBe(0)
+    expect(r.totalTarjetaUsd).toBe(0)
+  })
+})
+
 describe('GET /api/expenses', () => {
   it('totals no incluye los gastos con crédito; expenses sí los trae', async () => {
     const { db, user, app } = makeAppWithUser()
