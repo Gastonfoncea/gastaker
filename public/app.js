@@ -68,24 +68,22 @@ async function load() {
 }
 
 function render({ expenses }) {
-  // Pesos y dólares no se suman: el total grande es en pesos, el USD va aparte.
+  // Cada línea del header dice una sola cosa:
+  //   Total   -> plata que salió de la cuenta este mes, en pesos.
+  //   USD     -> plata que salió este mes, en dólares (solo débito).
+  //   Tarjeta -> consumos con crédito del mes (pesos y dólares): NO salieron
+  //              todavía, los debita el resumen el mes que viene (en pesos).
+  // Por eso el crédito queda afuera del total Y de la línea USD: si sumara en
+  // USD, el mismo consumo aparecería dos veces en pantalla (línea USD + Tarjeta).
   // Las categorías excluidas (EXCLUDED) se ven en la lista pero no suman a nada.
-  // Los consumos con crédito tampoco suman: se debitan el mes siguiente y van
-  // en su propia línea ("Tarjeta"), como los USD.
   const noSuma = (e) => EXCLUDED.has(e.category)
   const esCredito = (e) => e.payment_method === 'Crédito'
   const esArs = (e) => (e.currency || 'ARS') === 'ARS'
-  // Un gasto no suma a nada si su categoría está excluida, o si es un consumo
-  // con crédito EN PESOS (esos van a la línea Tarjeta). Un consumo con crédito
-  // en USD sí suma: la línea USD los cuenta igual, sin importar el medio de pago.
-  const noSumaFila = (e) => noSuma(e) || (esCredito(e) && esArs(e))
+  const noSumaFila = (e) => noSuma(e) || esCredito(e)
   const ars = expenses.filter(esArs)
   const usd = expenses.filter((e) => e.currency === 'USD')
-  const arsTotal = ars.filter((e) => !noSuma(e) && !esCredito(e)).reduce((s, e) => s + e.amount, 0)
-  const usdTotal = usd.filter((e) => !noSuma(e)).reduce((s, e) => s + e.amount, 0)
-  // La línea Tarjeta muestra las dos monedas: el resumen del mes que viene va a
-  // debitar los consumos en pesos MÁS los dólares convertidos, así que dejar los
-  // USD afuera mostraría solo una parte de lo que se viene.
+  const arsTotal = ars.filter((e) => !noSumaFila(e)).reduce((s, e) => s + e.amount, 0)
+  const usdTotal = usd.filter((e) => !noSumaFila(e)).reduce((s, e) => s + e.amount, 0)
   const tarjetaArs = ars.filter((e) => !noSuma(e) && esCredito(e)).reduce((s, e) => s + e.amount, 0)
   const tarjetaUsd = usd.filter((e) => !noSuma(e) && esCredito(e)).reduce((s, e) => s + e.amount, 0)
 
@@ -114,7 +112,7 @@ function render({ expenses }) {
   // (las anulaciones restan, así que una categoría puede netear a 0 y no se muestra)
   const totals = {}
   for (const e of ars) {
-    if (noSuma(e) || esCredito(e)) continue
+    if (noSumaFila(e)) continue
     totals[e.category] = (totals[e.category] || 0) + e.amount
   }
   const ranked = Object.entries(totals)
