@@ -70,11 +70,15 @@ async function load() {
 function render({ expenses }) {
   // Pesos y dólares no se suman: el total grande es en pesos, el USD va aparte.
   // Las categorías excluidas (EXCLUDED) se ven en la lista pero no suman a nada.
+  // Los consumos con crédito tampoco suman: se debitan el mes siguiente y van
+  // en su propia línea ("Tarjeta"), como los USD.
   const noSuma = (e) => EXCLUDED.has(e.category)
+  const esCredito = (e) => e.payment_method === 'Crédito'
   const ars = expenses.filter((e) => (e.currency || 'ARS') === 'ARS')
   const usd = expenses.filter((e) => e.currency === 'USD')
-  const arsTotal = ars.filter((e) => !noSuma(e)).reduce((s, e) => s + e.amount, 0)
+  const arsTotal = ars.filter((e) => !noSuma(e) && !esCredito(e)).reduce((s, e) => s + e.amount, 0)
   const usdTotal = usd.filter((e) => !noSuma(e)).reduce((s, e) => s + e.amount, 0)
+  const tarjetaTotal = ars.filter((e) => !noSuma(e) && esCredito(e)).reduce((s, e) => s + e.amount, 0)
 
   $('#total').innerHTML = arsTotal ? money(arsTotal, 'ARS') : '<span class="muted">$0</span>'
 
@@ -86,11 +90,19 @@ function render({ expenses }) {
     usdEl.classList.add('hidden')
   }
 
+  const tarjetaEl = $('#total-tarjeta')
+  if (tarjetaTotal > 0) {
+    tarjetaEl.innerHTML = `Tarjeta: ${money(tarjetaTotal, 'ARS')}`
+    tarjetaEl.classList.remove('hidden')
+  } else {
+    tarjetaEl.classList.add('hidden')
+  }
+
   // barra de proporción + leyenda: solo pesos, y solo categorías con neto > 0
   // (las anulaciones restan, así que una categoría puede netear a 0 y no se muestra)
   const totals = {}
   for (const e of ars) {
-    if (noSuma(e)) continue
+    if (noSuma(e) || esCredito(e)) continue
     totals[e.category] = (totals[e.category] || 0) + e.amount
   }
   const ranked = Object.entries(totals)
@@ -134,10 +146,11 @@ function render({ expenses }) {
         .map((e, i) => {
           const { day, time } = fmtDate(e.occurred_at)
           const card = e.card ? `<span class="row-card">•${e.card}</span>` : ''
-          return `<div class="row${noSuma(e) ? ' excluded' : ''}" style="animation-delay:${Math.min(i * 22, 260)}ms">
+          const credito = esCredito(e) ? '<span class="row-credito">crédito</span>' : ''
+          return `<div class="row${noSuma(e) || esCredito(e) ? ' excluded' : ''}" style="animation-delay:${Math.min(i * 22, 260)}ms">
             <div class="cell-date"><span class="d-day">${day}</span><span class="d-time">${time}</span></div>
             <div class="cell-merchant">
-              <span class="row-merchant">${escape(e.merchant)}</span>${card}
+              <span class="row-merchant">${escape(e.merchant)}</span>${card}${credito}
             </div>
             <button class="cat" data-id="${e.id}" data-cat="${e.category}">
               <span class="dot" style="background:${colorOf(e.category)}"></span>${e.category}
