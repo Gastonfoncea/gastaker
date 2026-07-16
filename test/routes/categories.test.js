@@ -23,7 +23,7 @@ describe('/api/categories', () => {
     const agent = await authedAgent(app)
     const res = await agent.get('/api/categories')
     expect(res.status).toBe(200)
-    expect(res.body.categories).toHaveLength(9)
+    expect(res.body.categories).toHaveLength(10)
     expect(res.body.categories[0]).toMatchObject({ name: 'Comida', color: '#FF6B35', count: 0 })
   })
 

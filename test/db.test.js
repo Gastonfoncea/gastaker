@@ -146,11 +146,11 @@ describe('db', () => {
   }
 
   describe('categorías', () => {
-    it('seedea las 9 categorías iniciales con color', () => {
+    it('seedea las 10 categorías iniciales con color', () => {
       const cats = db.listCategories()
       expect(cats.map((c) => c.name)).toEqual([
         'Comida', 'Supermercado', 'Transporte', 'Servicios',
-        'Suscripciones', 'Salud', 'Transferencias', 'Otros', 'Movimientos internos',
+        'Suscripciones', 'Salud', 'Transferencias', 'Tarjeta', 'Otros', 'Movimientos internos',
       ])
       expect(cats[0].color).toBe('#FF6B35')
       expect(cats[0].count).toBe(0)

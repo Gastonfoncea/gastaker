@@ -13,6 +13,7 @@ const DEFAULT_CATEGORIES = [
   ['Suscripciones', '#EC4899', 0],
   ['Salud', '#10B981', 0],
   ['Transferencias', '#F59E0B', 0],
+  ['Tarjeta', '#DC2626', 0],
   ['Otros', '#64748B', 0],
   ['Movimientos internos', '#94A3B8', 1],
 ]
@@ -28,6 +29,7 @@ const expensesSchema = (name) => `
     merchant          TEXT    NOT NULL,
     category          TEXT    NOT NULL,
     card              TEXT,
+    payment_method    TEXT,
     occurred_at       TEXT    NOT NULL,
     currency          TEXT    NOT NULL DEFAULT 'ARS',
     source            TEXT    NOT NULL DEFAULT 'santander',
@@ -179,11 +181,27 @@ export function createDb(path) {
     `)
   }
 
+  // --- Migración: payment_method en expenses (idempotente) ---
+  // 'Crédito' | 'Débito' | NULL. NULL (histórico) cuenta como débito en los totales.
+  // El backfill corre una sola vez: seedea la categoría "Tarjeta" (el pago del
+  // resumen se categoriza ahí) a los usuarios existentes; los nuevos la reciben
+  // vía DEFAULT_CATEGORIES. Si el usuario la borra después, no se re-seedea.
+  if (!sqlite.prepare('PRAGMA table_info(expenses)').all().some((c) => c.name === 'payment_method')) {
+    sqlite.exec('ALTER TABLE expenses ADD COLUMN payment_method TEXT')
+    sqlite.exec(`
+      INSERT INTO categories (user_id, name, color, excluded)
+      SELECT u.id, 'Tarjeta', '#DC2626', 0 FROM users u
+      WHERE NOT EXISTS (
+        SELECT 1 FROM categories c WHERE c.user_id = u.id AND c.name = 'Tarjeta' COLLATE NOCASE
+      )
+    `)
+  }
+
   const insertStmt = sqlite.prepare(`
     INSERT OR IGNORE INTO expenses
-      (user_id, gmail_message_id, amount, merchant, category, card, occurred_at, currency, source, needs_review)
+      (user_id, gmail_message_id, amount, merchant, category, card, payment_method, occurred_at, currency, source, needs_review)
     VALUES
-      (@user_id, @gmail_message_id, @amount, @merchant, @category, @card, @occurred_at, @currency, @source, @needs_review)
+      (@user_id, @gmail_message_id, @amount, @merchant, @category, @card, @payment_method, @occurred_at, @currency, @source, @needs_review)
   `)
 
   const listStmt = sqlite.prepare(`
@@ -220,6 +238,7 @@ export function createDb(path) {
         const info = insertStmt.run({
           user_id: userId,
           card: null,
+          payment_method: null,
           currency: 'ARS',
           source: 'santander',
           needs_review: 0,

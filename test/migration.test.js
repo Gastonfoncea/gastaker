@@ -95,9 +95,9 @@ describe('migración de esquema viejo a multi-user', () => {
   it('los datos huérfanos son invisibles vía forUser hasta adoptarlos', () => {
     const db = createDb(dbPath)
     const user = db.createUser({ email: 'gaston@test.com', password: 'x', isAdmin: true })
-    // El seed de createUser dio 9 categorías propias; los 2 gastos viejos NO se ven.
+    // El seed de createUser dio 10 categorías propias; los 2 gastos viejos NO se ven.
     expect(db.forUser(user.id).list('2026-06')).toHaveLength(0)
-    expect(db.forUser(user.id).listCategories()).toHaveLength(9)
+    expect(db.forUser(user.id).listCategories()).toHaveLength(10)
   })
 
   it('la lógica de bootstrap adopta gastos/comercios y la categoría custom', () => {
@@ -120,9 +120,9 @@ describe('migración de esquema viejo a multi-user', () => {
     // Ahora los 2 gastos se ven y la regla aprendida también.
     expect(udb.list('2026-06')).toHaveLength(2)
     expect(udb.findLearned('PAYU UBER 123')).toBe('Transporte')
-    // Las 9 default seedeadas + la custom "Mascotas" adoptada = 10; sin duplicar las default.
+    // Las 10 default seedeadas + la custom "Mascotas" adoptada = 11; sin duplicar las default.
     const cats = udb.listCategories()
-    expect(cats).toHaveLength(10)
+    expect(cats).toHaveLength(11)
     expect(cats.filter((c) => c.name === 'Comida')).toHaveLength(1)
     expect(cats.some((c) => c.name === 'Mascotas')).toBe(true)
   })
