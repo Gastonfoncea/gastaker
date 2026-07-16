@@ -19,7 +19,29 @@ Fecha
 Hora
 19:12`
 
+const MAIL_PAGO_RESUMEN = `Información sobre el pago de tu tarjeta
+Hola
+Santander
+Debitamos $987.357,33 de tu Cuenta en Pesos N° XXXX-2910 por el pago de tu Tarjeta SANTANDER VISA.
+
+    Tarjeta    XXXX-XXX3967
+    Saldo en pesos    $ 726.357,33
+    Saldo en dólares    u$s 174,00
+    Pago mínimo    $ 142.880,00`
+
 describe('santander.parse', () => {
+  it('parsea el pago del resumen de la tarjeta como débito real', () => {
+    const r = parse(MAIL_PAGO_RESUMEN)
+    expect(r).not.toBeNull()
+    expect(r.amount).toBe(987357.33)
+    expect(r.currency).toBe('ARS')
+    expect(r.merchant).toBe('Pago tarjeta SANTANDER VISA')
+    expect(r.card).toBe('3967')
+    expect(r.type).toBe('Débito')
+    expect(r.kind).toBe('pago_tarjeta')
+    expect(r.occurredAt).toBeNull()
+  })
+
   it('extrae monto, comercio, fecha/hora y tarjeta', () => {
     const r = parse(SAMPLE)
     expect(r).not.toBeNull()

@@ -27,6 +27,9 @@ function parseBody(text) {
   if (!text) return null
   if (isIgnored(text)) return null
 
+  const pago = parsePagoTarjeta(text)
+  if (pago) return pago
+
   const isAnulacion = /se anul[óo] el pago|pago.{0,20}anulad|anulaci[óo]n de consumo/i.test(text)
   const isTransfer = /Destinatario|CBU de Destino|N[úu]mero de comprobante/i.test(text)
 
@@ -105,4 +108,31 @@ function parseType(text) {
   if (/cr[eé]dito/i.test(text)) return 'Crédito'
   if (/d[eé]bito/i.test(text)) return 'Débito'
   return null
+}
+
+// Mail "pago de tu tarjeta": Santander debitó el resumen de la cuenta.
+// Es plata que sale de la cuenta HOY (los consumos con crédito individuales
+// no suman al total; este débito sí). El monto de "Debitamos" incluye el
+// saldo en dólares convertido a pesos. El mail no trae Fecha/Hora: occurredAt
+// queda null y la ingesta usa receivedAt.
+function parsePagoTarjeta(text) {
+  if (!/Debitamos/i.test(text) || !/pago de tu Tarjeta/i.test(text)) return null
+  const m = text.match(/Debitamos[\s*]*\$\s*([\d.,]+)/i)
+  if (!m) return null
+  const amount = parseAmount(m[1])
+  if (amount === null) return null
+  // Espacio horizontal ([ \t], no \s): el asunto "Información sobre el pago de
+  // tu tarjeta" también matchea, y con \s+ el regex cruzaba el salto de línea y
+  // capturaba la línea siguiente ("Hola") como marca.
+  const brand = text.match(/pago de tu Tarjeta[ \t]+([^\n\r.]+)/i)
+  const card = text.match(/Tarjeta[^\d\n\r]*(\d{4})/i)
+  return {
+    amount,
+    currency: 'ARS',
+    merchant: `Pago tarjeta${brand ? ' ' + brand[1].replace(/[\s*]+$/, '').trim() : ''}`,
+    occurredAt: null,
+    card: card ? card[1] : null,
+    type: 'Débito',
+    kind: 'pago_tarjeta',
+  }
 }

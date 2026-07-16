@@ -25,10 +25,13 @@ export function ingestRouter({ db }) {
       return res.json({ skipped: true })
     }
 
-    // Categoría: transferencia fija; si no, regla estática -> comercio aprendido -> default.
+    // Categoría: pago de resumen y transferencia son fijas; si no, regla
+    // estática -> comercio aprendido -> default.
     let category
     let needsReview = 0
-    if (parsed.kind === 'transferencia') {
+    if (parsed.kind === 'pago_tarjeta') {
+      category = 'Tarjeta'
+    } else if (parsed.kind === 'transferencia') {
       const learned = udb.findLearned(parsed.merchant)
       category = learned || 'Transferencias'
       needsReview = learned ? 0 : 1

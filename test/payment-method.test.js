@@ -38,6 +38,16 @@ Fecha
 Hora
 19:12`
 
+const MAIL_PAGO_RESUMEN = `Información sobre el pago de tu tarjeta
+Hola
+Santander
+Debitamos $987.357,33 de tu Cuenta en Pesos N° XXXX-2910 por el pago de tu Tarjeta SANTANDER VISA.
+
+    Tarjeta    XXXX-XXX3967
+    Saldo en pesos    $ 726.357,33
+    Saldo en dólares    u$s 174,00
+    Pago mínimo    $ 142.880,00`
+
 const gasto = (over = {}) => ({
   gmail_message_id: `m-${Math.random()}`,
   amount: 100,
@@ -170,6 +180,22 @@ describe('ingesta: persiste el medio de pago', () => {
   it('un consumo con débito guarda payment_method = Débito', async () => {
     await ingest('m-deb', MAIL_DEBITO)
     expect(udb.list('2026-07').find((r) => r.gmail_message_id === 'm-deb').payment_method).toBe('Débito')
+  })
+
+  it('el pago del resumen entra con categoría "Tarjeta", suma como Débito y usa receivedAt', async () => {
+    const res = await request(app)
+      .post('/api/ingest')
+      .set('X-Webhook-Secret', token)
+      .send({ messageId: 'm-pago', body: MAIL_PAGO_RESUMEN, receivedAt: '2026-07-15T09:00:00.000Z' })
+    expect(res.status).toBe(200)
+    expect(res.body.inserted).toBe(true)
+    expect(res.body.category).toBe('Tarjeta')
+    const row = udb.list('2026-07').find((r) => r.gmail_message_id === 'm-pago')
+    expect(row.amount).toBe(987357.33)
+    expect(row.payment_method).toBe('Débito')
+    expect(row.category).toBe('Tarjeta')
+    expect(row.needs_review).toBe(0)
+    expect(row.occurred_at).toBe('2026-07-15T09:00:00')
   })
 })
 
