@@ -1,6 +1,7 @@
 // src/routes/expenses.js
 import express from 'express'
 import { requireAuth } from '../auth.js'
+import { randomToken } from '../crypto.js'
 
 export function expensesRouter({ db }) {
   const router = express.Router()
@@ -20,6 +21,32 @@ export function expensesRouter({ db }) {
       totals[e.category] = (totals[e.category] || 0) + e.amount
     }
     res.json({ month, expenses, totals })
+  })
+
+  // POST /api/expenses  { amount, merchant, category } -> 201 { expense }
+  // Alta manual: source='manual', fecha=ahora, ARS, cuenta como débito
+  // (payment_method NULL). El gmail_message_id sintético satisface el UNIQUE.
+  router.post('/', (req, res) => {
+    const udb = db.forUser(req.userId)
+    const { amount, merchant, category } = req.body || {}
+    if (!Number.isFinite(amount) || amount === 0) {
+      return res.status(400).json({ error: 'monto inválido' })
+    }
+    const m = (merchant || '').trim()
+    if (!m) return res.status(400).json({ error: 'falta el comercio' })
+    const wanted = String(category || '').trim().toLowerCase()
+    const cat = udb.listCategories().find((c) => c.name.toLowerCase() === wanted)
+    if (!cat) return res.status(400).json({ error: `no existe la categoría "${category}"` })
+
+    const { id } = udb.insert({
+      gmail_message_id: `manual-${randomToken(12)}`,
+      amount,
+      merchant: m,
+      category: cat.name,
+      occurred_at: new Date().toISOString().slice(0, 19),
+      source: 'manual',
+    })
+    res.status(201).json({ expense: udb.getExpense(id) })
   })
 
   // PATCH /api/expenses/:id  { category, learn? }
