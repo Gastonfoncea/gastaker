@@ -321,6 +321,11 @@ body {
   align-items: baseline;
   gap: 10px;
 }
+.ledger-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .movs-count {
   font-size: 12px;
   color: var(--ink-3);
@@ -426,8 +431,9 @@ body {
   flex: none;
 }
 
-/* badge "crédito" en el ledger: el consumo se ve pero no suma (mismo look que cat-nosum) */
-.row-credito {
+/* badges "crédito" (se ve pero no suma) y "manual" (cargado a mano) */
+.row-credito,
+.row-manual {
   font-size: 11px;
   color: var(--ink-3);
   border: 1px solid var(--line-soft);
@@ -552,6 +558,58 @@ body {
 }
 .catmenu .scope-cat {
   font-weight: 600;
+}
+
+/* form de alta manual dentro del popover */
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  width: 220px;
+}
+.add-form input,
+.add-form select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.add-form input:focus,
+.add-form select:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+.add-form .add-submit {
+  display: block;
+  font-weight: 500;
+  color: #fff;
+  background: var(--ink);
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: opacity 0.15s var(--ease);
+}
+.add-form .add-submit:hover {
+  opacity: 0.85;
+}
+.add-error {
+  font-size: 12px;
+  color: #dc2626;
+  margin: 0;
+}
+
+/* opción destructiva del popover: eliminar un gasto manual */
+.catmenu .cat-delete {
+  color: #dc2626;
+  margin-top: 4px;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0;
 }
 
 /* ===========================================================

@@ -157,10 +157,11 @@ function render({ expenses }) {
           const { day, time } = fmtDate(e.occurred_at)
           const card = e.card ? `<span class="row-card">•${e.card}</span>` : ''
           const credito = esCredito(e) ? '<span class="row-credito">crédito</span>' : ''
+          const manual = e.source === 'manual' ? '<span class="row-manual">manual</span>' : ''
           return `<div class="row${noSumaFila(e) ? ' excluded' : ''}" style="animation-delay:${Math.min(i * 22, 260)}ms">
             <div class="cell-date"><span class="d-day">${day}</span><span class="d-time">${time}</span></div>
             <div class="cell-merchant">
-              <span class="row-merchant">${escape(e.merchant)}</span>${card}${credito}
+              <span class="row-merchant">${escape(e.merchant)}</span>${card}${credito}${manual}
             </div>
             <button class="cat" data-id="${e.id}" data-cat="${e.category}">
               <span class="dot" style="background:${colorOf(e.category)}"></span>${e.category}
@@ -196,21 +197,82 @@ const menu = $('#catmenu')
 
 function openCatMenu(anchor, id, current) {
   mainMenu.classList.add('hidden') // si el hamburguesa estaba abierto, no lo dejamos detrás del popover
-  menu.innerHTML = CATS.map(
-    (c) => `<button data-name="${c.name}" aria-current="${c.name === current}">
+  const exp = lastData.expenses.find((e) => e.id === id)
+  // los gastos manuales se pueden borrar; los del mail son historial del banco
+  const del = exp && exp.source === 'manual' ? '<button class="cat-delete" data-del="1">Eliminar gasto</button>' : ''
+  menu.innerHTML =
+    CATS.map(
+      (c) => `<button data-name="${c.name}" aria-current="${c.name === current}">
       <span class="dot" style="background:${c.color}"></span>${c.name}
       <span class="check">✓</span>
     </button>`
-  ).join('')
+    ).join('') + del
   positionMenu(anchor)
 
-  menu.querySelectorAll('button').forEach((b) => {
+  menu.querySelectorAll('button[data-name]').forEach((b) => {
     b.addEventListener('click', (ev) => {
       ev.stopPropagation()
       const name = b.dataset.name
       if (name === current) return closeMenu()
       openScopeStep(anchor, id, name)
     })
+  })
+
+  const delBtn = menu.querySelector('[data-del]')
+  if (delBtn) {
+    delBtn.addEventListener('click', async (ev) => {
+      ev.stopPropagation()
+      closeMenu()
+      if (!confirm('¿Eliminar este gasto?')) return
+      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(err.error || 'No se pudo borrar')
+      }
+      load()
+    })
+  }
+}
+
+/* ---------- alta manual ---------- */
+// Reusa el popover #catmenu: el contenido es un mini form (monto/comercio/categoría).
+function openAddMenu(anchor) {
+  mainMenu.classList.add('hidden')
+  menu.innerHTML = `
+    <form id="add-form" class="add-form">
+      <input id="add-amount" inputmode="decimal" placeholder="Monto" autocomplete="off" />
+      <input id="add-merchant" type="text" placeholder="Comercio" autocomplete="off" />
+      <select id="add-cat">
+        ${CATS.map((c) => `<option value="${escape(c.name)}">${escape(c.name)}</option>`).join('')}
+      </select>
+      <p id="add-error" class="add-error hidden"></p>
+      <button type="submit" class="add-submit">Agregar</button>
+    </form>
+  `
+  positionMenu(anchor)
+  const form = menu.querySelector('#add-form')
+  // que los clicks dentro del form no burbujeen al closeMenu global del document
+  form.addEventListener('click', (ev) => ev.stopPropagation())
+  $('#add-amount').focus()
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault()
+    // es-AR: coma decimal -> punto, para que Number() la entienda
+    const amount = Number($('#add-amount').value.trim().replace(',', '.'))
+    const res = await fetch('/api/expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, merchant: $('#add-merchant').value.trim(), category: $('#add-cat').value }),
+    })
+    if (res.ok) {
+      closeMenu()
+      load()
+    } else {
+      const err = await res.json().catch(() => ({}))
+      const el = $('#add-error')
+      el.textContent = err.error || 'No se pudo guardar'
+      el.classList.remove('hidden')
+    }
   })
 }
 
@@ -286,6 +348,11 @@ $('#next').addEventListener('click', () => {
 })
 
 $('#cat-filter').onchange = (ev) => setFilter(ev.target.value)
+
+$('#add-btn').addEventListener('click', (ev) => {
+  ev.stopPropagation()
+  openAddMenu(ev.currentTarget)
+})
 
 // menú hamburguesa
 const menuBtn = $('#menu-btn')
