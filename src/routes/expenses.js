@@ -49,6 +49,20 @@ export function expensesRouter({ db }) {
     res.status(201).json({ expense: udb.getExpense(id) })
   })
 
+  // DELETE /api/expenses/:id — solo gastos manuales; los del mail son historial
+  // del banco y no se tocan.
+  router.delete('/:id', (req, res) => {
+    const udb = db.forUser(req.userId)
+    const id = Number.parseInt(req.params.id, 10)
+    const expense = udb.getExpense(id)
+    if (!expense) return res.status(404).json({ error: 'no encontrado' })
+    if (expense.source !== 'manual') {
+      return res.status(400).json({ error: 'solo se pueden borrar gastos manuales' })
+    }
+    udb.deleteExpense(id)
+    res.json({ ok: true })
+  })
+
   // PATCH /api/expenses/:id  { category, learn? }
   // learn: además de clasificar este gasto, aprende "merchant -> category"
   // y re-clasifica todos los gastos de ese comercio (histórico incluido).

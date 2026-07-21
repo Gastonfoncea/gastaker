@@ -109,3 +109,50 @@ describe('POST /api/expenses', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('DELETE /api/expenses/:id', () => {
+  let db, user, app, agent
+  beforeEach(async () => {
+    ;({ db, user, app } = makeAppWithUser())
+    agent = await authedAgent(app)
+  })
+
+  const crearManual = async () => {
+    const res = await agent.post('/api/expenses').send({ amount: 100, merchant: 'X', category: 'Comida' })
+    return res.body.expense.id
+  }
+
+  it('borra un gasto manual', async () => {
+    const id = await crearManual()
+    const res = await agent.delete(`/api/expenses/${id}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true })
+    expect(db.forUser(user.id).getExpense(id)).toBeUndefined()
+  })
+
+  it('un gasto que vino del mail -> 400 y no se borra', async () => {
+    const { id } = db.forUser(user.id).insert(gasto()) // source default: 'santander'
+    const res = await agent.delete(`/api/expenses/${id}`)
+    expect(res.status).toBe(400)
+    expect(db.forUser(user.id).getExpense(id)).toBeDefined()
+  })
+
+  it('gasto de otro usuario -> 404 y no se borra', async () => {
+    const otro = db.createUser({ email: 'otro@test.com', password: 'x' })
+    const { id } = db.forUser(otro.id).insert(gasto({ source: 'manual' }))
+    const res = await agent.delete(`/api/expenses/${id}`)
+    expect(res.status).toBe(404)
+    expect(db.forUser(otro.id).getExpense(id)).toBeDefined()
+  })
+
+  it('inexistente -> 404', async () => {
+    const res = await agent.delete('/api/expenses/99999')
+    expect(res.status).toBe(404)
+  })
+
+  it('sin sesión -> 401', async () => {
+    const id = await crearManual()
+    const res = await request(app).delete(`/api/expenses/${id}`)
+    expect(res.status).toBe(401)
+  })
+})
