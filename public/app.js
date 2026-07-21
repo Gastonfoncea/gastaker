@@ -284,6 +284,10 @@ function openAddMenu(anchor) {
         btn.disabled = false
       }
     } catch {
+      // error de red: mismo mensaje inline que un 4xx, no silencio
+      const el = $('#add-error')
+      el.textContent = 'No se pudo guardar'
+      el.classList.remove('hidden')
       btn.disabled = false
     }
   })
