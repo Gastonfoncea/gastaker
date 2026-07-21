@@ -233,7 +233,8 @@ export function createDb(path) {
       )
 
     return {
-      // Devuelve { inserted: boolean }. false si el (user_id, gmail_message_id) ya existía.
+      // Devuelve { inserted, id }. inserted=false si el (user_id, gmail_message_id)
+      // ya existía; id solo tiene sentido cuando inserted=true.
       insert(record) {
         const info = insertStmt.run({
           user_id: userId,
@@ -244,7 +245,7 @@ export function createDb(path) {
           needs_review: 0,
           ...record,
         })
-        return { inserted: info.changes > 0 }
+        return { inserted: info.changes > 0, id: Number(info.lastInsertRowid) }
       },
       // month: 'YYYY-MM'. Devuelve las filas de ese mes, más recientes primero.
       list(month) {
@@ -253,6 +254,12 @@ export function createDb(path) {
       // Fila completa de un gasto por id (scopeado), o undefined si no es de este user.
       getExpense(id) {
         return sqlite.prepare('SELECT * FROM expenses WHERE id = ? AND user_id = ?').get(id, userId)
+      },
+
+      // Borra un gasto propio. Devuelve true si borró. El chequeo de que sea
+      // manual lo hace la ruta (acá el método queda genérico y scopeado).
+      deleteExpense(id) {
+        return sqlite.prepare('DELETE FROM expenses WHERE id = ? AND user_id = ?').run(id, userId).changes > 0
       },
 
       // Resumen del mes: total ARS, total USD, y desglose ARS por categoría (neto > 0).
