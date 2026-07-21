@@ -58,9 +58,11 @@ forma de registrar un gasto a mano desde la app.
     case-insensitive contra `listCategories()`; se guarda el nombre canónico
     de la db) → 400 si no existe.
   - Inserta con: `gmail_message_id = 'manual-' + randomToken(12)`,
-    `source = 'manual'`, `occurred_at = new Date().toISOString().slice(0, 19)`
-    (mismo formato que la ingesta), `card = null`, `payment_method = null`,
-    `currency = 'ARS'`, `needs_review = 0`.
+    `source = 'manual'`, `occurred_at` = ahora en hora argentina, calculado con
+    `Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires', ... })`
+    y formateado `YYYY-MM-DDTHH:mm:ss` (mismo formato que traen los mails del
+    banco), `card = null`, `payment_method = null`, `currency = 'ARS'`,
+    `needs_review = 0`.
   - Responde 201 con la fila creada (`getExpense` del id insertado).
 - **`DELETE /api/expenses/:id`**:
   - `getExpense(id)` → 404 si no existe o no es del usuario.

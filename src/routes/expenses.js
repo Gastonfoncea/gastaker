@@ -43,7 +43,7 @@ export function expensesRouter({ db }) {
       amount,
       merchant: m,
       category: cat.name,
-      occurred_at: new Date().toISOString().slice(0, 19),
+      occurred_at: nowArgentina(),
       source: 'manual',
     })
     res.status(201).json({ expense: udb.getExpense(id) })
@@ -95,4 +95,15 @@ export function expensesRouter({ db }) {
 function defaultMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+// "Ahora" en hora argentina, formato YYYY-MM-DDTHH:mm:ss (el mismo que traen
+// los mails del banco, así los gastos manuales ordenan y agrupan consistente).
+function nowArgentina() {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).format(new Date()).replace(' ', 'T')
 }

@@ -45,6 +45,13 @@ function fmtDate(iso) {
   const [, mo, da] = date.split('-')
   return { day: `${da}/${mo}`, time: t.slice(0, 5) }
 }
+// es-AR: "5.000" -> 5000 ; "1.234,56" -> 1234.56 ; "1234,56" -> 1234.56 ; "12.5" -> 12.5
+function parseMonto(raw) {
+  let v = raw.trim()
+  if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.')
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(v)) v = v.replace(/\./g, '')
+  return Number(v)
+}
 function monthLabel(ym) {
   const [y, m] = ym.split('-').map(Number)
   return `${MONTHS[m - 1]} ${y}`
@@ -257,21 +264,27 @@ function openAddMenu(anchor) {
 
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault()
-    // es-AR: coma decimal -> punto, para que Number() la entienda
-    const amount = Number($('#add-amount').value.trim().replace(',', '.'))
-    const res = await fetch('/api/expenses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, merchant: $('#add-merchant').value.trim(), category: $('#add-cat').value }),
-    })
-    if (res.ok) {
-      closeMenu()
-      load()
-    } else {
-      const err = await res.json().catch(() => ({}))
-      const el = $('#add-error')
-      el.textContent = err.error || 'No se pudo guardar'
-      el.classList.remove('hidden')
+    const amount = parseMonto($('#add-amount').value)
+    const btn = form.querySelector('.add-submit')
+    btn.disabled = true
+    try {
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, merchant: $('#add-merchant').value.trim(), category: $('#add-cat').value }),
+      })
+      if (res.ok) {
+        closeMenu()
+        load()
+      } else {
+        const err = await res.json().catch(() => ({}))
+        const el = $('#add-error')
+        el.textContent = err.error || 'No se pudo guardar'
+        el.classList.remove('hidden')
+        btn.disabled = false
+      }
+    } catch {
+      btn.disabled = false
     }
   })
 }

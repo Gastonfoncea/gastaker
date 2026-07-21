@@ -3,6 +3,11 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import request from 'supertest'
 import { makeUserDb, makeAppWithUser, authedAgent } from './helpers.js'
 
+// Mes actual con el mismo reloj (hora argentina) que usa el POST para occurred_at.
+const mesActual = () =>
+  new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit' })
+    .format(new Date())
+
 const gasto = (over = {}) => ({
   gmail_message_id: `m-${Math.random()}`,
   amount: 100,
@@ -59,10 +64,16 @@ describe('POST /api/expenses', () => {
 
   it('aparece en el listado del mes y suma al total', async () => {
     await agent.post('/api/expenses').send({ amount: 5000, merchant: 'Verdulería', category: 'Comida' })
-    const month = new Date().toISOString().slice(0, 7) // mismo reloj (UTC) que occurred_at
-    const res = await agent.get(`/api/expenses?month=${month}`)
+    const res = await agent.get(`/api/expenses?month=${mesActual()}`)
     expect(res.body.expenses).toHaveLength(1)
     expect(res.body.totals).toEqual({ Comida: 5000 })
+  })
+
+  it('occurred_at queda en hora argentina (YYYY-MM-DDTHH:mm:ss, mes actual)', async () => {
+    const res = await agent.post('/api/expenses').send({ amount: 100, merchant: 'X', category: 'Comida' })
+    const { occurred_at } = res.body.expense
+    expect(occurred_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+    expect(occurred_at.startsWith(mesActual())).toBe(true)
   })
 
   it('acepta la categoría con otra capitalización y guarda el nombre canónico', async () => {
@@ -81,8 +92,7 @@ describe('POST /api/expenses', () => {
   it('monto negativo se acepta y resta del total', async () => {
     await agent.post('/api/expenses').send({ amount: 5000, merchant: 'X', category: 'Comida' })
     await agent.post('/api/expenses').send({ amount: -2000, merchant: 'X', category: 'Comida' })
-    const month = new Date().toISOString().slice(0, 7)
-    const res = await agent.get(`/api/expenses?month=${month}`)
+    const res = await agent.get(`/api/expenses?month=${mesActual()}`)
     expect(res.body.totals).toEqual({ Comida: 3000 })
   })
 
@@ -99,8 +109,7 @@ describe('POST /api/expenses', () => {
   it('dos POST idénticos crean dos gastos (ids sintéticos distintos)', async () => {
     await agent.post('/api/expenses').send({ amount: 100, merchant: 'X', category: 'Comida' })
     await agent.post('/api/expenses').send({ amount: 100, merchant: 'X', category: 'Comida' })
-    const month = new Date().toISOString().slice(0, 7)
-    const res = await agent.get(`/api/expenses?month=${month}`)
+    const res = await agent.get(`/api/expenses?month=${mesActual()}`)
     expect(res.body.expenses).toHaveLength(2)
   })
 
