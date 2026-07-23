@@ -23,6 +23,7 @@ const MONTHS = [
 const $ = (s) => document.querySelector(s)
 let currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
 let activeCat = null // categoría seleccionada para filtrar la tabla
+const FILTRO_CREDITO = '__credito__' // valor centinela del dropdown: "solo crédito", no es una categoría
 let lastData = { expenses: [] } // último payload, para re-renderizar sin refetch
 
 /* ---------- formato ---------- */
@@ -144,14 +145,26 @@ function render({ expenses }) {
     )
     .join('')
 
-  // filtro: dropdown con las categorías presentes este mes (Todas + cada una)
+  // filtro: dropdown con "Solo crédito" (si el mes tiene crédito) + las
+  // categorías presentes este mes (Todas + cada una)
   const present = CATS.map((c) => c.name).filter((name) => expenses.some((e) => e.category === name))
+  const opcionCredito = expenses.some(esCredito)
+    ? `<option value="${FILTRO_CREDITO}"${activeCat === FILTRO_CREDITO ? ' selected' : ''}>💳 Solo crédito</option>` +
+      `<option disabled>─────────</option>`
+    : ''
   $('#cat-filter').innerHTML =
     `<option value="">Todas las categorías</option>` +
+    opcionCredito +
     present.map((c) => `<option value="${c}"${c === activeCat ? ' selected' : ''}>${c}</option>`).join('')
 
-  // ledger (filtrado por la categoría activa, si hay)
-  const shown = activeCat ? expenses.filter((e) => e.category === activeCat) : expenses
+  // ledger (filtrado por la categoría activa o "solo crédito", si hay).
+  // El centinela se chequea ANTES que los nombres: nunca colisiona con una categoría.
+  const shown =
+    activeCat === FILTRO_CREDITO
+      ? expenses.filter(esCredito)
+      : activeCat
+        ? expenses.filter((e) => e.category === activeCat)
+        : expenses
   const empty = shown.length === 0
   $('#movs-count').textContent = shown.length
     ? `${shown.length} ${shown.length === 1 ? 'gasto' : 'gastos'}`
@@ -186,8 +199,8 @@ function render({ expenses }) {
   })
 }
 
-// Aplica el filtro de categoría del dropdown y re-renderiza (sin refetch).
-// cat = '' (Todas) -> null.
+// Aplica el filtro del dropdown y re-renderiza (sin refetch).
+// cat = '' (Todas) -> null; FILTRO_CREDITO -> solo consumos con crédito.
 function setFilter(cat) {
   activeCat = cat || null
   render(lastData)
